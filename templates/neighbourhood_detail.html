@@ -1,0 +1,321 @@
+{% extends "base.html" %}
+{% block title %}{{ nb.neighbourhood_name }}{% endblock %}
+{% block page_title %}
+  <i class="fas fa-map-marker-alt me-2 text-primary"></i>{{ nb.neighbourhood_name }}
+  <span class="badge-risk badge-{{ nb.risk_level }} ms-2">{{ nb.risk_level }}</span>
+{% endblock %}
+{% block breadcrumb %}
+  <a href="{{ url_for('neighbourhoods') }}" style="color:inherit;text-decoration:none">Neighbourhoods</a>
+  &rsaquo; {{ nb.neighbourhood_name }}
+{% endblock %}
+
+{% block content %}
+<!-- ── Hard constraint alerts ─────────────────────────────────────────────── -->
+{% if constraint_result.messages %}
+  <div class="{% if constraint_result.status == 'AMBIGUOUS' %}alert-ambiguous{% else %}alert-hard-constraint{% endif %} mb-3">
+    <strong><i class="fas fa-shield-alt me-2"></i>Hard Constraint Triggered: {{ constraint_result.status }}</strong>
+    <ul class="mb-0 mt-2">
+      {% for msg in constraint_result.messages %}<li>{{ msg }}</li>{% endfor %}
+    </ul>
+  </div>
+{% endif %}
+
+<div class="row g-3">
+  <!-- Left column -->
+  <div class="col-lg-5">
+    <!-- Risk score card -->
+    <div class="card mb-3">
+      <div class="card-header"><i class="fas fa-calculator me-2 text-primary"></i>Risk Score & Classification</div>
+      <div class="card-body text-center">
+        {% if nb.risk_score %}
+          <div style="font-size:64px;font-weight:800;color:{{ 'var(--high)' if nb.risk_level=='High' else ('var(--medium)' if nb.risk_level=='Medium' else 'var(--low)') }};line-height:1">
+            {{ nb.risk_score }}
+          </div>
+          <div class="badge-risk badge-{{ nb.risk_level }} mt-1" style="font-size:13px;padding:6px 16px">
+            {{ nb.risk_level }} Risk
+          </div>
+          <div style="background:#f8fafc;border-radius:10px;padding:14px;margin-top:16px;text-align:left;font-size:12.5px">
+            <div class="fw-700 mb-2">Score Formula</div>
+            <code style="font-size:11.5px;color:#1e293b">
+              = (Climate×0.35) + (Vulnerability×0.30)<br>
+              &nbsp;&nbsp;+ (Built Env.×0.20) + (Service Risk×0.15)
+            </code>
+          </div>
+        {% else %}
+          <div class="text-muted py-3">
+            <i class="fas fa-ban fa-2x mb-2"></i><br>
+            Risk score unavailable<br>
+            <small>{{ constraint_result.status }}</small>
+          </div>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- Contribution breakdown -->
+    {% if assessment %}
+    <div class="card mb-3">
+      <div class="card-header"><i class="fas fa-layer-group me-2 text-primary"></i>Score Contribution Breakdown</div>
+      <div class="card-body">
+        {% set contribs = [
+          ('Climate / Heat Index', assessment.climate_contribution, '#ef4444'),
+          ('Vulnerability Score', assessment.vuln_contribution, '#f97316'),
+          ('Built Environment', assessment.built_contribution, '#3b82f6'),
+          ('Service Access Risk', assessment.service_contribution, '#22c55e'),
+        ] %}
+        {% for label, val, color in contribs %}
+        <div class="contrib-row">
+          <div class="contrib-label">{{ label }}</div>
+          <div class="contrib-bar-wrap">
+            <div class="contrib-bar-fill" style="width:{{ (val or 0) / 40 * 100 }}%;background:{{ color }}"></div>
+          </div>
+          <div class="contrib-pct" style="color:{{ color }}">{{ val or 0 }}</div>
+        </div>
+        {% endfor %}
+        <div class="mt-3">
+          <canvas id="contribChart" height="160"></canvas>
+        </div>
+        <p class="text-muted small mt-2 mb-0">
+          <i class="fas fa-info-circle me-1"></i>
+          Each component shows its additive contribution to the total risk score (max 100).
+          Climate (35%) + Vulnerability (30%) + Built Env. (20%) + Service Risk (15%) = 100%.
+        </p>
+      </div>
+    </div>
+    {% endif %}
+
+    <!-- Escalation State Badge -->
+    <div class="card mb-3" style="border-left:4px solid {{ 'var(--high)' if escalation_state.colour=='high' else ('var(--medium)' if escalation_state.colour=='medium' else ('#a855f7' if escalation_state.colour=='ambig' else 'var(--low)')) }}">
+      <div class="card-body py-2">
+        <div class="d-flex align-items-center gap-3">
+          <i class="fas {{ escalation_state.icon }} fa-lg" style="color:{{ 'var(--high)' if escalation_state.colour=='high' else ('var(--medium)' if escalation_state.colour=='medium' else ('#a855f7' if escalation_state.colour=='ambig' else 'var(--low)')) }}"></i>
+          <div>
+            <div class="fw-700" style="font-size:13px">System State: {{ escalation_state.label }}</div>
+            <div class="text-muted" style="font-size:12px">{{ escalation_state.state }} — Based on current risk score and level</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Explain Risk Score (expandable) -->
+    {% if computed and computed.can_auto_classify %}
+    <div class="card mb-3">
+      <div class="card-header" style="cursor:pointer" data-bs-toggle="collapse" data-bs-target="#explainCollapse">
+        <i class="fas fa-microscope me-2 text-primary"></i>Explain Risk Score
+        <i class="fas fa-chevron-down float-end mt-1"></i>
+      </div>
+      <div id="explainCollapse" class="collapse show">
+        <div class="card-body" style="font-size:13px">
+          {% set fs = computed.formula_steps %}
+          <div class="fw-700 mb-2">Step-by-step calculation:</div>
+          <table class="table table-sm" style="font-size:12.5px">
+            <thead style="background:#f8fafc">
+              <tr><th>Factor</th><th>Raw Value</th><th>Normalised</th><th>Weight</th><th>Points Added</th></tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><strong>Climate / Heat</strong></td>
+                <td>{{ fs.climate_raw }}°C</td>
+                <td>{{ fs.climate_norm }}</td>
+                <td>35%</td>
+                <td class="fw-700" style="color:#ef4444">{{ computed.climate_contribution }}</td>
+              </tr>
+              <tr>
+                <td><strong>Vulnerability</strong></td>
+                <td>{{ fs.vuln_raw }}</td>
+                <td>{{ fs.vuln_norm }}</td>
+                <td>30%</td>
+                <td class="fw-700" style="color:#f97316">{{ computed.vuln_contribution }}</td>
+              </tr>
+              <tr>
+                <td><strong>Built Environment</strong></td>
+                <td>{{ fs.built_raw }}</td>
+                <td>{{ fs.built_norm }}</td>
+                <td>20%</td>
+                <td class="fw-700" style="color:#3b82f6">{{ computed.built_contribution }}</td>
+              </tr>
+              <tr>
+                <td><strong>Service Access Risk</strong></td>
+                <td>{{ fs.serv_raw }} (inv.)</td>
+                <td>{{ fs.serv_norm }}</td>
+                <td>15%</td>
+                <td class="fw-700" style="color:#22c55e">{{ computed.service_contribution }}</td>
+              </tr>
+              <tr style="border-top:2px solid #1e293b">
+                <td colspan="4" class="fw-700 text-end">Total Risk Score</td>
+                <td class="fw-700" style="font-size:15px">{{ computed.risk_score }}</td>
+              </tr>
+            </tbody>
+          </table>
+          <div class="alert alert-light py-2 mb-0" style="font-size:12px">
+            <i class="fas fa-info-circle me-1 text-primary"></i>
+            <strong>Formula:</strong> Score = (Climate×0.35 + Vulnerability×0.30 + Built×0.20 + ServiceRisk×0.15) × 100<br>
+            Service Risk = inverse of Service Access Score (low access = high risk).
+            <a href="/api/risk-explain/{{ nb.neighbourhood_id }}" target="_blank" class="ms-2">
+              <i class="fas fa-code me-1"></i>View JSON
+            </a>
+          </div>
+        </div>
+      </div>
+    </div>
+    {% endif %}
+
+    <!-- Override (Health Officer / Admin only) -->
+    {% if session.role in ('Health Officer', 'Administrator') %}
+    <div class="card mb-3" style="border:1px solid #fecaca">
+      <div class="card-header" style="background:#fef2f2;color:#991b1b">
+        <i class="fas fa-user-shield me-2"></i>Authorised Risk Override
+        <span class="badge bg-danger ms-2" style="font-size:10px">{{ session.role }} only</span>
+      </div>
+      <div class="card-body">
+        <p class="text-muted small">
+          Hard Constraint HC-05/HC-06/HC-07: Override requires reason and is permanently logged.
+        </p>
+        <form method="POST" action="{{ url_for('override_risk', nb_id=nb.neighbourhood_id) }}">
+          <div class="mb-2">
+            <label class="form-label">New Risk Level</label>
+            <select class="form-select" name="new_level" required>
+              <option value="Low"     {% if nb.risk_level=='Low' %}selected{% endif %}>Low</option>
+              <option value="Medium"  {% if nb.risk_level=='Medium' %}selected{% endif %}>Medium</option>
+              <option value="High"    {% if nb.risk_level=='High' %}selected{% endif %}>High</option>
+              <option value="AMBIGUOUS" {% if nb.risk_level=='AMBIGUOUS' %}selected{% endif %}>AMBIGUOUS</option>
+            </select>
+          </div>
+          <div class="mb-2">
+            <label class="form-label">Override Reason <span class="text-danger">*</span></label>
+            <textarea class="form-control" name="reason" rows="2"
+              placeholder="Required: describe why this override is necessary…" required></textarea>
+          </div>
+          <button type="submit" class="btn btn-danger btn-sm w-100">
+            <i class="fas fa-pen me-1"></i>Submit Override (Logged to Audit)
+          </button>
+        </form>
+        {% if overrides %}
+        <div class="mt-3">
+          <div class="fw-700 small mb-1">Override History</div>
+          {% for ov in overrides %}
+          <div class="small text-muted mb-1">
+            <i class="fas fa-history me-1"></i>
+            {{ ov.officer_name }} changed <strong>{{ ov.original_level }}</strong>
+            → <strong>{{ ov.new_level }}</strong>
+            on {{ ov.overridden_at[:10] }}:
+            <em>{{ ov.reason }}</em>
+          </div>
+          {% endfor %}
+        </div>
+        {% endif %}
+      </div>
+    </div>
+    {% endif %}
+  </div>
+
+  <!-- Right column -->
+  <div class="col-lg-7">
+    <!-- Data fields -->
+    <div class="card mb-3">
+      <div class="card-header"><i class="fas fa-database me-2 text-primary"></i>Neighbourhood Data</div>
+      <div class="card-body">
+        <div class="row g-2">
+          {% set fields = [
+            ('Temperature', (nb.temperature|string + '°C') if nb.temperature else 'MISSING ⚠', nb.temperature and nb.temperature > 38),
+            ('Heat Index', (nb.heat_index|string) if nb.heat_index else 'MISSING ⚠', false),
+            ('Humidity', (nb.humidity|string + '%') if nb.humidity else '—', false),
+            ('Population', nb.population, false),
+            ('Elderly %', (nb.elderly_percentage|string + '%') if nb.elderly_percentage else '—', nb.elderly_percentage and nb.elderly_percentage > 25),
+            ('Child %', (nb.child_percentage|string + '%') if nb.child_percentage else '—', false),
+            ('Low Income %', (nb.low_income_percentage|string + '%') if nb.low_income_percentage else '—', nb.low_income_percentage and nb.low_income_percentage > 40),
+            ('Pop. Density', nb.population_density, false),
+            ('Green Space %', (nb.green_space_percentage|string + '%') if nb.green_space_percentage else '—', nb.green_space_percentage and nb.green_space_percentage < 10),
+            ('Building Density', nb.building_density, false),
+            ('Healthcare Facilities', nb.healthcare_facilities, nb.healthcare_facilities == 0),
+            ('Nearest Hospital (km)', (nb.nearest_hospital_distance|string + ' km') if nb.nearest_hospital_distance else '—', nb.nearest_hospital_distance and nb.nearest_hospital_distance > 15),
+            ('Cooling Centres', nb.cooling_centres, nb.cooling_centres == 0),
+            ('Transport Access', (nb.public_transport_access|string + '/10') if nb.public_transport_access else '—', false),
+            ('Service Access Score', nb.service_access_score, nb.service_access_score and nb.service_access_score < 35),
+            ('Vulnerability Score', nb.vulnerability_score, nb.vulnerability_score and nb.vulnerability_score > 65),
+            ('Built Env. Score', nb.built_environment_score, nb.built_environment_score and nb.built_environment_score > 70),
+            ('Infectious Disease Cases', nb.infectious_disease_cases, false),
+            ('Previous Heat Incidents', nb.previous_heat_incidents, nb.previous_heat_incidents and nb.previous_heat_incidents > 10),
+            ('Comm. Reach %', (nb.communication_reach_percentage|string + '%') if nb.communication_reach_percentage else '—', false),
+          ] %}
+          {% for label, val, warn in fields %}
+          <div class="col-6">
+            <div style="background:#f8fafc;border-radius:8px;padding:10px 12px">
+              <div style="font-size:11px;color:#64748b;font-weight:600">{{ label }}</div>
+              <div style="font-weight:700;font-size:14px;color:{{ '#ef4444' if warn else '#1e293b' }}">
+                {{ val if val is not none and val != '' else '—' }}
+                {% if warn %}<i class="fas fa-exclamation-triangle text-danger ms-1" style="font-size:11px"></i>{% endif %}
+              </div>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+
+    <!-- Communication plan -->
+    <div class="card mb-3">
+      <div class="card-header"><i class="fas fa-bullhorn me-2 text-primary"></i>Recommended Communication Plan</div>
+      <div class="card-body">
+        <div class="d-flex align-items-center gap-2 mb-3">
+          <span class="badge badge-urgency-{{ comm_plan.urgency }}" style="font-size:12px;padding:5px 12px">
+            {{ comm_plan.urgency }}
+          </span>
+          <strong>{{ comm_plan.message_type }}</strong>
+        </div>
+        <div style="background:#f8fafc;border-radius:8px;padding:12px 14px;font-size:13px;line-height:1.7;margin-bottom:12px">
+          {{ comm_plan.message }}
+        </div>
+        <div class="fw-700 small mb-1">Recommended Channels</div>
+        <div class="d-flex flex-wrap gap-1 mb-3">
+          {% for ch in comm_plan.channels %}
+            <span class="badge" style="background:#eff6ff;color:#1e40af;border:1px solid #bfdbfe;font-size:11.5px;padding:4px 10px">
+              {{ ch }}
+            </span>
+          {% endfor %}
+        </div>
+        <div class="fw-700 small mb-1">Required Actions</div>
+        <ul class="mb-0">
+          {% for a in comm_plan.actions %}
+            <li style="font-size:13px">{{ a }}</li>
+          {% endfor %}
+        </ul>
+        <div class="mt-3">
+          <a href="{{ url_for('communication') }}?nb={{ nb.neighbourhood_id }}"
+             class="btn btn-primary btn-sm">
+            <i class="fas fa-paper-plane me-1"></i>Send Communication
+          </a>
+        </div>
+      </div>
+    </div>
+
+    <!-- Reviews -->
+    {% if reviews %}
+    <div class="card mb-3">
+      <div class="card-header"><i class="fas fa-clipboard-check me-2 text-medium"></i>Human Review History</div>
+      <div class="card-body">
+        {% for r in reviews %}
+        <div class="mb-2 p-2" style="background:#fff7ed;border-radius:8px;border:1px solid #fed7aa">
+          <div class="d-flex justify-content-between">
+            <span class="fw-700 small">{{ r.reason[:80] }}</span>
+            <span class="badge badge-status-{{ r.status | replace(' ','-') }}" style="font-size:11px">
+              {{ r.status }}
+            </span>
+          </div>
+          <div class="small text-muted">Assigned to: {{ r.officer_name or 'Unassigned' }} | {{ r.created_at[:10] }}</div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const contributionData = {{ contributions | safe }};
+document.addEventListener('DOMContentLoaded', () => {
+  initContribBar('contribChart', contributionData);
+});
+</script>
+{% endblock %}

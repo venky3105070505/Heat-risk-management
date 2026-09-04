@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Sign Up – Heat-Risk Planner</title>
+  <meta name="description" content="Create a new staff account for the City Health Department Heat-Risk Planner.">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" rel="stylesheet">
+  <link href="{{ url_for('static', filename='css/style.css') }}" rel="stylesheet">
+  <style>
+  .pw-strength-bar{height:5px;border-radius:3px;transition:width .3s,background .3s;margin-top:6px}
+  .req-item{font-size:11.5px;display:flex;align-items:center;gap:5px;color:#94a3b8;transition:color .2s}
+  .req-item.met{color:#22c55e}
+  </style>
+</head>
+<body>
+<div class="login-page">
+  <div class="login-card" style="max-width:460px">
+
+    <!-- Header -->
+    <div class="login-logo">
+      <i class="fas fa-user-plus" style="color:#fff"></i>
+    </div>
+    <h1 class="text-center mb-1" style="font-size:20px;font-weight:800">Create Account</h1>
+    <p class="text-center text-muted mb-4" style="font-size:12.5px">
+      Heat-Risk Planner &mdash; City Health Department
+    </p>
+
+    <!-- Flash messages -->
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% for cat, msg in messages %}
+        <div class="alert alert-{{ 'danger' if cat=='danger' else 'info' }} py-2 mb-3" role="alert" style="font-size:13px">
+          <i class="fas fa-{{ 'exclamation-circle' if cat=='danger' else 'info-circle' }} me-2"></i>{{ msg }}
+        </div>
+      {% endfor %}
+    {% endwith %}
+
+    <!-- Signup form -->
+    <form method="POST" action="{{ url_for('signup') }}" novalidate id="signupForm">
+
+      <!-- Full Name -->
+      <div class="mb-3">
+        <label class="form-label" for="full_name">
+          <i class="fas fa-id-card me-1"></i>Full Name <span class="text-danger">*</span>
+        </label>
+        <input type="text" class="form-control" id="full_name" name="full_name"
+               placeholder="Dr. Jane Smith" required
+               value="{{ form.get('full_name','') }}">
+      </div>
+
+      <!-- Email -->
+      <div class="mb-3">
+        <label class="form-label" for="email">
+          <i class="fas fa-envelope me-1"></i>Email Address <span class="text-danger">*</span>
+        </label>
+        <input type="email" class="form-control" id="email" name="email"
+               placeholder="jane.smith@healthdept.gov" required autocomplete="email"
+               value="{{ form.get('email','') }}">
+      </div>
+
+      <!-- Role -->
+      <div class="mb-3">
+        <label class="form-label" for="role">
+          <i class="fas fa-user-tag me-1"></i>Role <span class="text-danger">*</span>
+        </label>
+        <select class="form-select" id="role" name="role" required>
+          <option value="">— Select your role —</option>
+          {% for r in allowed_roles %}
+          <option value="{{ r }}" {% if form.get('role') == r %}selected{% endif %}>{{ r }}</option>
+          {% endfor %}
+        </select>
+        <div class="form-text" style="font-size:11px">
+          <i class="fas fa-info-circle me-1 text-muted"></i>
+          Administrator accounts are created by your department head.
+        </div>
+      </div>
+
+      <!-- Password -->
+      <div class="mb-2">
+        <label class="form-label" for="password">
+          <i class="fas fa-lock me-1"></i>Password <span class="text-danger">*</span>
+        </label>
+        <div style="position:relative">
+          <input type="password" class="form-control" id="password" name="password"
+                 placeholder="Minimum 8 characters" required autocomplete="new-password"
+                 style="padding-right:40px" oninput="checkStrength(this.value)">
+          <button type="button" onclick="togglePw('password','eyeIcon1')"
+                  style="position:absolute;right:10px;top:50%;transform:translateY(-50%);
+                         background:none;border:none;color:#64748b;cursor:pointer;padding:0">
+            <i class="fas fa-eye" id="eyeIcon1"></i>
+          </button>
+        </div>
+        <!-- Strength bar -->
+        <div style="background:#e2e8f0;border-radius:3px;margin-top:6px;height:5px">
+          <div id="strengthBar" class="pw-strength-bar" style="width:0%;background:#ef4444"></div>
+        </div>
+        <!-- Requirements -->
+        <div class="mt-2 d-flex flex-wrap gap-2">
+          <span class="req-item" id="req-len"><i class="fas fa-circle-check"></i>8+ chars</span>
+          <span class="req-item" id="req-upper"><i class="fas fa-circle-check"></i>Uppercase</span>
+          <span class="req-item" id="req-num"><i class="fas fa-circle-check"></i>Number</span>
+        </div>
+      </div>
+
+      <!-- Confirm Password -->
+      <div class="mb-4">
+        <label class="form-label" for="confirm_password">
+          <i class="fas fa-lock me-1"></i>Confirm Password <span class="text-danger">*</span>
+        </label>
+        <div style="position:relative">
+          <input type="password" class="form-control" id="confirm_password" name="confirm_password"
+                 placeholder="Repeat password" required autocomplete="new-password"
+                 style="padding-right:40px" oninput="checkMatch()">
+          <button type="button" onclick="togglePw('confirm_password','eyeIcon2')"
+                  style="position:absolute;right:10px;top:50%;transform:translateY(-50%);
+                         background:none;border:none;color:#64748b;cursor:pointer;padding:0">
+            <i class="fas fa-eye" id="eyeIcon2"></i>
+          </button>
+        </div>
+        <div id="matchMsg" style="font-size:11.5px;margin-top:4px"></div>
+      </div>
+
+      <button type="submit" class="btn btn-primary w-100 py-2" id="btn-signup">
+        <i class="fas fa-user-plus me-2"></i>Create Account
+      </button>
+    </form>
+
+    <hr class="my-4">
+    <p class="text-center mb-0" style="font-size:13px">
+      Already have an account?
+      <a href="{{ url_for('login') }}" class="fw-700" style="color:#1a56db;text-decoration:none">
+        Sign In
+      </a>
+    </p>
+
+    <p class="text-center text-muted mt-3 mb-0" style="font-size:11px">
+      <i class="fas fa-shield-alt me-1"></i>
+      Your password is hashed and never stored in plain text.<br>
+      This system processes only aggregate neighbourhood-level data.
+    </p>
+  </div>
+</div>
+
+<script>
+function togglePw(fieldId, iconId) {
+  const f = document.getElementById(fieldId);
+  const i = document.getElementById(iconId);
+  if (f.type === 'password') { f.type = 'text'; i.classList.replace('fa-eye','fa-eye-slash'); }
+  else                       { f.type = 'password'; i.classList.replace('fa-eye-slash','fa-eye'); }
+}
+
+function checkStrength(v) {
+  const len   = v.length >= 8;
+  const upper = /[A-Z]/.test(v);
+  const num   = /[0-9]/.test(v);
+  toggle('req-len',   len);
+  toggle('req-upper', upper);
+  toggle('req-num',   num);
+  const score = [len, upper, num].filter(Boolean).length;
+  const bar   = document.getElementById('strengthBar');
+  const cols  = ['#ef4444','#f97316','#22c55e'];
+  bar.style.width      = (score / 3 * 100) + '%';
+  bar.style.background = cols[score - 1] || '#ef4444';
+}
+
+function toggle(id, met) {
+  document.getElementById(id).classList.toggle('met', met);
+}
+
+function checkMatch() {
+  const pw  = document.getElementById('password').value;
+  const cp  = document.getElementById('confirm_password').value;
+  const msg = document.getElementById('matchMsg');
+  if (!cp) { msg.textContent = ''; return; }
+  if (pw === cp) {
+    msg.innerHTML = '<span style="color:#22c55e"><i class="fas fa-check-circle me-1"></i>Passwords match</span>';
+  } else {
+    msg.innerHTML = '<span style="color:#ef4444"><i class="fas fa-times-circle me-1"></i>Passwords do not match</span>';
+  }
+}
+</script>
+</body>
+</html>

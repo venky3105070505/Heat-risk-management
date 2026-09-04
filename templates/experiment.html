@@ -1,0 +1,157 @@
+{% extends "base.html" %}
+{% block title %}Experiment Results{% endblock %}
+{% block page_title %}<i class="fas fa-flask me-2 text-primary"></i>Experiment Results{% endblock %}
+{% block breadcrumb %}Baseline vs. Neighbourhood-Targeted Strategy — measured from dataset{% endblock %}
+
+{% block content %}
+<!-- Experiment info -->
+<div class="card mb-3" style="background:linear-gradient(135deg,#1e3a5f,#1a56db);color:#fff;border:none">
+  <div class="card-body">
+    <div class="row">
+      <div class="col-md-8">
+        <h5 class="mb-1"><i class="fas fa-microscope me-2"></i>Experiment Design</h5>
+        <p class="mb-0" style="font-size:13px;opacity:.85">
+          Comparing two advisory strategies using the generated dataset of
+          <strong>{{ metrics.total_neighbourhoods }}</strong> neighbourhoods
+          ({{ metrics.high_count }} High, {{ metrics.medium_count }} Medium, {{ metrics.low_count }} Low).
+          Results are calculated from actual data — not hard-coded.
+        </p>
+      </div>
+      <div class="col-md-4 text-end">
+        <a href="{{ url_for('export_report', report_type='audit') }}" class="btn btn-light btn-sm">
+          <i class="fas fa-download me-1"></i>Export Audit Log
+        </a>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Baseline vs Proposed comparison table -->
+<div class="card mb-3">
+  <div class="card-header"><i class="fas fa-table me-2 text-primary"></i>Baseline Comparison Table</div>
+  <div class="table-container">
+    <table class="hrt-table">
+      <thead>
+        <tr>
+          <th>Metric</th>
+          <th>Baseline (Generic Advisory)</th>
+          <th>Proposed (Neighbourhood-Targeted)</th>
+          <th>Improvement</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% set rows = [
+          ('High-Risk Areas Correctly Prioritised', metrics.baseline.high_prioritised, metrics.proposed.high_prioritised, '='),
+          ('High-Risk Areas Reached (%)', metrics.baseline.high_reached_pct|string + '%', metrics.proposed.high_reached_pct|string + '%', '+'),
+          ('Communication Timeliness', metrics.baseline.timeliness, metrics.proposed.timeliness, '+'),
+          ('Resource Utilisation (%)', metrics.baseline.resource_util_pct|string + '%', metrics.proposed.resource_util_pct|string + '%', '+'),
+          ('Missed High-Risk Areas', metrics.baseline.missed, metrics.proposed.missed, '-'),
+          ('Precision (%)', metrics.baseline.precision|string + '%', metrics.proposed.precision|string + '%', '+'),
+          ('Recall / Coverage (%)', metrics.baseline.recall|string + '%', metrics.proposed.recall|string + '%', '+'),
+        ] %}
+        {% for metric, base_val, prop_val, direction in rows %}
+        <tr>
+          <td><strong>{{ metric }}</strong></td>
+          <td style="color:#64748b">{{ base_val }}</td>
+          <td style="color:{{ '#22c55e' if direction == '+' else ('#ef4444' if direction=='-' else '#1a56db') }};font-weight:700">
+            {{ prop_val }}
+          </td>
+          <td>
+            {% if direction == '+' %}
+              <span class="badge bg-success">↑ Improved</span>
+            {% elif direction == '-' %}
+              <span class="badge bg-danger">↓ Reduced (desired)</span>
+            {% else %}
+              <span class="badge bg-secondary">= Same</span>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Chart -->
+<div class="card mb-3">
+  <div class="card-header"><i class="fas fa-chart-bar me-2 text-primary"></i>Baseline vs Proposed — Visual Comparison</div>
+  <div class="card-body">
+    <canvas id="experimentChart" height="120"></canvas>
+  </div>
+</div>
+
+<!-- Error / edge case analysis -->
+<div class="card mb-3">
+  <div class="card-header"><i class="fas fa-exclamation-triangle me-2 text-medium"></i>Error Analysis & Limitations</div>
+  <div class="card-body">
+    <div class="row g-3">
+      <div class="col-md-4">
+        <div class="constraint-card constraint-soft">
+          <div class="constraint-id">EA-01</div>
+          <div class="constraint-name">Missing Data Bias</div>
+          <div class="constraint-desc">
+            {{ metrics.total_neighbourhoods - metrics.high_count - metrics.medium_count - metrics.low_count }}
+            neighbourhoods excluded from metrics due to missing temperature or ambiguous indicators.
+            This may undercount high-risk areas in practice.
+          </div>
+        </div>
+      </div>
+      <div class="col-md-4">
+        <div class="constraint-card constraint-soft">
+          <div class="constraint-id">EA-02</div>
+          <div class="constraint-name">Synthetic Data Limitation</div>
+          <div class="constraint-desc">
+            All neighbourhood data is synthetically generated. Real-world correlations between
+            temperature, built environment, and vulnerability may differ significantly.
+            Baseline comparison should be validated with real historical data.
+          </div>
+        </div>
+      </div>
+      <div class="col-md-4">
+        <div class="constraint-card constraint-soft">
+          <div class="constraint-id">EA-03</div>
+          <div class="constraint-name">Fixed Weight Assumption</div>
+          <div class="constraint-desc">
+            Risk weights (Climate 35%, Vulnerability 30%, Built 20%, Service 15%) are domain-expert estimates.
+            Actual weight optimisation using historical health outcomes would require real epidemiological data.
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Key findings -->
+<div class="card">
+  <div class="card-header"><i class="fas fa-star me-2 text-primary"></i>Key Findings</div>
+  <div class="card-body">
+    <ul style="font-size:13.5px;line-height:2">
+      <li>The neighbourhood-targeted approach identifies
+          <strong>{{ metrics.high_count }}</strong> high-risk neighbourhoods that would be
+          treated identically to low-risk areas under the baseline generic advisory.</li>
+      <li>High-risk communication reach improved from
+          <strong>{{ metrics.baseline.high_reached_pct }}%</strong> (baseline) to
+          <strong>{{ metrics.proposed.high_reached_pct }}%</strong> (targeted).</li>
+      <li>Missed high-risk areas reduced from
+          <strong>{{ metrics.baseline.missed }}</strong> to
+          <strong>{{ metrics.proposed.missed }}</strong>.</li>
+      <li>Communication timeliness improved from
+          <strong>{{ metrics.baseline.timeliness }}</strong> to
+          <strong>{{ metrics.proposed.timeliness }}</strong>.</li>
+      <li>The transparent scoring formula allows health officers to challenge and override any score —
+          maintaining human accountability throughout.</li>
+    </ul>
+    <p class="text-muted small mt-2">
+      <i class="fas fa-info-circle me-1"></i>
+      For reproducible analysis, run <code>experiment.ipynb</code> in the project root.
+    </p>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const metricsData = {{ metrics_json | safe }};
+document.addEventListener('DOMContentLoaded', () => initExperimentChart('experimentChart', metricsData));
+</script>
+{% endblock %}

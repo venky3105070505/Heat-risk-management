@@ -1,0 +1,126 @@
+{% extends "base.html" %}
+{% block title %}Interactive Risk Map{% endblock %}
+{% block page_title %}<i class="fas fa-globe me-2 text-primary"></i>Interactive Risk Map{% endblock %}
+{% block breadcrumb %}60 neighbourhoods colour-coded by heat-risk level — click any marker for details{% endblock %}
+
+{% block head %}
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<style>
+#map{height:calc(100vh - 190px);border-radius:12px;box-shadow:0 4px 24px rgba(0,0,0,.12)}
+.map-filters{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
+.filter-btn{padding:6px 16px;border-radius:20px;border:2px solid transparent;
+  font-size:12.5px;font-weight:600;cursor:pointer;transition:all .18s}
+.filter-btn.f-all      {background:#1e293b;color:#fff;border-color:#1e293b}
+.filter-btn.f-high     {background:#fee2e2;color:#991b1b;border-color:#fca5a5}
+.filter-btn.f-medium   {background:#fef9c3;color:#854d0e;border-color:#fde047}
+.filter-btn.f-low      {background:#dcfce7;color:#166534;border-color:#86efac}
+.filter-btn.f-review   {background:#eff6ff;color:#1e40af;border-color:#93c5fd}
+.filter-btn.f-escalated{background:#fdf4ff;color:#6b21a8;border-color:#d8b4fe}
+.filter-btn.active     {filter:brightness(0.84);box-shadow:0 0 0 3px rgba(0,0,0,.18)}
+.map-legend .ld{display:inline-block;width:13px;height:13px;border-radius:50%;margin-right:6px;vertical-align:middle}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="map-filters">
+  <button class="filter-btn f-all active" onclick="filterMap('all',this)"><i class="fas fa-globe me-1"></i>All</button>
+  <button class="filter-btn f-high"       onclick="filterMap('high',this)"><i class="fas fa-fire me-1"></i>High Risk</button>
+  <button class="filter-btn f-medium"     onclick="filterMap('medium',this)"><i class="fas fa-exclamation me-1"></i>Medium</button>
+  <button class="filter-btn f-low"        onclick="filterMap('low',this)"><i class="fas fa-check me-1"></i>Low Risk</button>
+  <button class="filter-btn f-review"     onclick="filterMap('review',this)"><i class="fas fa-clipboard-check me-1"></i>Needs Review</button>
+  <button class="filter-btn f-escalated"  onclick="filterMap('escalated',this)"><i class="fas fa-exclamation-triangle me-1"></i>Escalated</button>
+</div>
+<div class="row g-3">
+  <div class="col-lg-9"><div id="map"></div></div>
+  <div class="col-lg-3">
+    <div class="card h-100">
+      <div class="card-header"><i class="fas fa-layer-group me-2 text-primary"></i>Legend & Stats</div>
+      <div class="card-body">
+        <div class="map-legend" style="font-size:13px;line-height:2">
+          <div><span class="ld" style="background:#ef4444"></span>High Risk</div>
+          <div><span class="ld" style="background:#f97316"></span>Medium Risk</div>
+          <div><span class="ld" style="background:#22c55e"></span>Low Risk</div>
+          <div><span class="ld" style="background:#a855f7"></span>Ambiguous</div>
+          <div><span class="ld" style="background:#1a56db;outline:2px solid #7c3aed;outline-offset:2px"></span>Escalated</div>
+        </div>
+        <hr>
+        <div class="fw-700 small mb-1">Visible</div>
+        <div id="visCount" class="badge bg-secondary" style="font-size:13px">All 60</div>
+        <hr>
+        <div class="fw-700 small mb-1 mt-1">Instructions</div>
+        <div style="font-size:12px;color:#64748b">Click any marker to see full details and navigate to the neighbourhood page.</div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+const MAP_DATA = {{ map_data | safe }};
+const COLOURS  = {High:'#ef4444',Medium:'#f97316',Low:'#22c55e',
+                  AMBIGUOUS:'#a855f7',MISSING_DATA:'#94a3b8',EXTREME_VALUE:'#f59e0b'};
+
+const leafMap = L.map('map').setView([-33.87, 151.21], 11);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+  {attribution:'&copy; OpenStreetMap contributors', maxZoom:18}).addTo(leafMap);
+
+const allMarkers = [];
+
+MAP_DATA.forEach(nb => {
+  if (!nb.latitude || !nb.longitude) return;
+  const col = COLOURS[nb.risk_level] || '#94a3b8';
+  const m = L.circleMarker([nb.latitude, nb.longitude], {
+    radius:9, fillColor:col,
+    color: nb.has_escalation ? '#7c3aed' : '#fff',
+    weight: nb.has_escalation ? 3 : 1.5,
+    opacity:1, fillOpacity:0.88
+  });
+  const revBadge = nb.needs_review   ? `<span class="badge bg-warning text-dark ms-1" style="font-size:10px">Review</span>` : '';
+  const escBadge = nb.has_escalation ? `<span class="badge bg-danger ms-1" style="font-size:10px">Escalated</span>` : '';
+  m.bindPopup(`
+    <div style="font-family:'Inter',sans-serif;min-width:200px">
+      <div style="font-weight:800;font-size:14px;margin-bottom:6px">${nb.neighbourhood_name}</div>
+      <div style="margin-bottom:8px">
+        <span class="badge" style="background:${col}">${nb.risk_level}</span>
+        ${revBadge}${escBadge}
+      </div>
+      <table style="font-size:12px;width:100%;border-collapse:collapse">
+        <tr><td style="color:#64748b;padding:2px 4px">Risk Score</td><td style="font-weight:700">${nb.risk_score ?? 'N/A'}</td></tr>
+        <tr><td style="color:#64748b;padding:2px 4px">Temperature</td><td>${nb.temperature ? nb.temperature+'°C' : 'N/A'}</td></tr>
+        <tr><td style="color:#64748b;padding:2px 4px">Vulnerability</td><td>${nb.vulnerability_score ?? 'N/A'}</td></tr>
+        <tr><td style="color:#64748b;padding:2px 4px">Service Access</td><td>${nb.service_access_score ?? 'N/A'}</td></tr>
+        <tr><td style="color:#64748b;padding:2px 4px">Comm. Reach</td><td>${nb.communication_reach_percentage ? nb.communication_reach_percentage+'%' : 'N/A'}</td></tr>
+      </table>
+      <a href="/neighbourhood/${nb.neighbourhood_id}"
+         style="display:block;margin-top:10px;text-align:center;padding:7px;
+                background:#1a56db;color:#fff;border-radius:7px;font-size:12px;
+                text-decoration:none;font-weight:700">
+        View Full Details &rarr;
+      </a>
+    </div>
+  `);
+  m._nb = nb;
+  m.addTo(leafMap);
+  allMarkers.push(m);
+});
+
+function filterMap(type, btn) {
+  document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  let visible = 0;
+  allMarkers.forEach(m => {
+    const nb = m._nb;
+    let show = type === 'all'
+      || (type === 'high'      && nb.risk_level === 'High')
+      || (type === 'medium'    && nb.risk_level === 'Medium')
+      || (type === 'low'       && nb.risk_level === 'Low')
+      || (type === 'review'    && nb.needs_review)
+      || (type === 'escalated' && nb.has_escalation);
+    show ? (m.addTo(leafMap), visible++) : m.remove();
+  });
+  document.getElementById('visCount').textContent = `${visible} shown`;
+}
+</script>
+{% endblock %}

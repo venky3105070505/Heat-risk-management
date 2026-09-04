@@ -1,0 +1,171 @@
+{% extends "base.html" %}
+{% block title %}Strategy Comparison{% endblock %}
+{% block page_title %}<i class="fas fa-balance-scale me-2 text-primary"></i>Strategy Comparison{% endblock %}
+{% block breadcrumb %}Objective A: Maximum Coverage vs Objective B: Resource Efficiency{% endblock %}
+
+{% block content %}
+<!-- Header -->
+<div class="card mb-3" style="background:linear-gradient(135deg,#1e3a5f,#1a56db);color:#fff;border:none">
+  <div class="card-body py-3">
+    <div class="row align-items-center">
+      <div class="col-md-8">
+        <h5 class="mb-1"><i class="fas fa-info-circle me-2"></i>Competing Objectives — Decision Support</h5>
+        <p class="mb-0" style="font-size:13px;opacity:.85">
+          The system simulates two response strategies using {{ comparison_data.total_high_risk }} high-risk and
+          {{ comparison_data.total_medium_risk }} medium-risk neighbourhoods.
+          Maximum resources available: {{ comparison_data.max_resources }} field visits / communications.
+        </p>
+      </div>
+      <div class="col-md-4 text-end">
+        <span class="badge bg-light text-dark">Decision Support Only</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Side-by-side columns -->
+<div class="row g-3 mb-3">
+  <div class="col-lg-6">
+    <div class="strategy-col strategy-a h-100">
+      <div class="strategy-label">OBJECTIVE A</div>
+      <div class="strategy-title">📡 Maximum Coverage</div>
+      <p style="font-size:13px;color:#1e40af;margin-bottom:16px">
+        Goal: Reach the maximum number of high-risk neighbourhoods regardless of resource cost.
+        Prioritises breadth of response.
+      </p>
+      <div class="row g-2">
+        {% set a = comparison_data.obj_a %}
+        <div class="col-6">
+          <div style="background:rgba(255,255,255,.6);border-radius:8px;padding:12px">
+            <div class="strategy-metric-label">Areas Reached</div>
+            <div class="strategy-metric-value text-primary">{{ a.neighbourhoods_reached }}</div>
+          </div>
+        </div>
+        <div class="col-6">
+          <div style="background:rgba(255,255,255,.6);border-radius:8px;padding:12px">
+            <div class="strategy-metric-label">High-Risk Coverage</div>
+            <div class="strategy-metric-value text-primary">{{ a.high_risk_covered_pct }}%</div>
+          </div>
+        </div>
+        <div class="col-6">
+          <div style="background:rgba(255,255,255,.6);border-radius:8px;padding:12px">
+            <div class="strategy-metric-label">Est. Response Time</div>
+            <div class="strategy-metric-value text-primary">{{ a.est_response_time_hrs }}h</div>
+          </div>
+        </div>
+        <div class="col-6">
+          <div style="background:rgba(255,255,255,.6);border-radius:8px;padding:12px">
+            <div class="strategy-metric-label">Resource Usage</div>
+            <div class="strategy-metric-value text-primary">{{ a.resource_usage_pct }}%</div>
+          </div>
+        </div>
+        <div class="col-6">
+          <div style="background:rgba(255,255,255,.6);border-radius:8px;padding:12px">
+            <div class="strategy-metric-label">Urgent Areas Missed</div>
+            <div class="strategy-metric-value {{ 'text-high' if a.urgent_areas_missed > 0 else 'text-low' }}">
+              {{ a.urgent_areas_missed }}
+            </div>
+          </div>
+        </div>
+        <div class="col-6">
+          <div style="background:rgba(255,255,255,.6);border-radius:8px;padding:12px">
+            <div class="strategy-metric-label">Avg Risk Score</div>
+            <div class="strategy-metric-value text-primary">{{ a.avg_risk_score }}</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="col-lg-6">
+    <div class="strategy-col strategy-b h-100">
+      <div class="strategy-label">OBJECTIVE B</div>
+      <div class="strategy-title">⚡ Resource Efficiency</div>
+      <p style="font-size:13px;color:#15803d;margin-bottom:16px">
+        Goal: Prioritise the highest-scoring neighbourhoods using limited staff.
+        Focuses depth over breadth.
+      </p>
+      <div class="row g-2">
+        {% set b = comparison_data.obj_b %}
+        <div class="col-6">
+          <div style="background:rgba(255,255,255,.6);border-radius:8px;padding:12px">
+            <div class="strategy-metric-label">Areas Reached</div>
+            <div class="strategy-metric-value text-low">{{ b.neighbourhoods_reached }}</div>
+          </div>
+        </div>
+        <div class="col-6">
+          <div style="background:rgba(255,255,255,.6);border-radius:8px;padding:12px">
+            <div class="strategy-metric-label">High-Risk Coverage</div>
+            <div class="strategy-metric-value text-low">{{ b.high_risk_covered_pct }}%</div>
+          </div>
+        </div>
+        <div class="col-6">
+          <div style="background:rgba(255,255,255,.6);border-radius:8px;padding:12px">
+            <div class="strategy-metric-label">Est. Response Time</div>
+            <div class="strategy-metric-value text-low">{{ b.est_response_time_hrs }}h</div>
+          </div>
+        </div>
+        <div class="col-6">
+          <div style="background:rgba(255,255,255,.6);border-radius:8px;padding:12px">
+            <div class="strategy-metric-label">Resource Usage</div>
+            <div class="strategy-metric-value text-low">{{ b.resource_usage_pct }}%</div>
+          </div>
+        </div>
+        <div class="col-6">
+          <div style="background:rgba(255,255,255,.6);border-radius:8px;padding:12px">
+            <div class="strategy-metric-label">Urgent Areas Missed</div>
+            <div class="strategy-metric-value {{ 'text-high' if b.urgent_areas_missed > 0 else 'text-low' }}">
+              {{ b.urgent_areas_missed }}
+            </div>
+          </div>
+        </div>
+        <div class="col-6">
+          <div style="background:rgba(255,255,255,.6);border-radius:8px;padding:12px">
+            <div class="strategy-metric-label">Avg Risk Score</div>
+            <div class="strategy-metric-value text-low">{{ b.avg_risk_score }}</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Chart -->
+<div class="card mb-3">
+  <div class="card-header"><i class="fas fa-chart-bar me-2 text-primary"></i>Side-by-Side Comparison</div>
+  <div class="card-body">
+    <canvas id="strategyChart" height="120"></canvas>
+  </div>
+</div>
+
+<!-- Recommendation -->
+<div class="card" style="border:1px solid #bfdbfe">
+  <div class="card-body">
+    <h6><i class="fas fa-lightbulb me-2 text-primary"></i>System Recommendation (Decision Support Only)</h6>
+    <p style="font-size:13.5px">
+      {% if comparison_data.obj_a.urgent_areas_missed == 0 %}
+        <strong>Objective A (Maximum Coverage)</strong> is recommended when enough resources are available —
+        it reaches <strong>all high-risk areas</strong> with no urgent areas missed.
+      {% elif comparison_data.obj_b.avg_risk_score > comparison_data.obj_a.avg_risk_score %}
+        <strong>Objective B (Resource Efficiency)</strong> may be preferred under severe resource constraints —
+        it targets the highest-scoring areas but misses <strong>{{ comparison_data.obj_b.urgent_areas_missed }}</strong> urgent areas.
+        A Health Officer should review which neighbourhoods are missed before choosing this strategy.
+      {% else %}
+        Both strategies have trade-offs. A <strong>Health Officer must review</strong> and decide based on
+        current staffing, available cooling centres, and community vulnerability context.
+      {% endif %}
+    </p>
+    <div class="alert-hard-constraint" style="font-size:12.5px">
+      <i class="fas fa-shield-alt me-2"></i>
+      <strong>HC-02:</strong> Regardless of strategy, all high-risk neighbourhoods remain open for monitoring.
+      This page is decision-support only — a Health Officer must approve the final response strategy.
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const comparisonData = {{ comparison | safe }};
+document.addEventListener('DOMContentLoaded', () => initStrategyChart('strategyChart', comparisonData));
+</script>
+{% endblock %}

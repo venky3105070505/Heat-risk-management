@@ -1,0 +1,175 @@
+{% extends "base.html" %}
+{% block title %}Stakeholder Feedback{% endblock %}
+{% block page_title %}<i class="fas fa-comments me-2 text-primary"></i>Stakeholder Feedback{% endblock %}
+{% block breadcrumb %}Prototype validation feedback — clearly labelled as sample stakeholder responses{% endblock %}
+
+{% block content %}
+<div class="alert alert-warning py-2 mb-3" style="font-size:13px">
+  <i class="fas fa-info-circle me-2"></i>
+  <strong>Prototype Validation Notice:</strong> The pre-loaded feedback below is fictional prototype-validation
+  feedback from representative roles. It is clearly labelled as sample data and was not collected from real user interviews.
+  You can submit new feedback using the form below.
+</div>
+
+<div class="row g-3">
+  <!-- Feedback form -->
+  <div class="col-lg-4">
+    <div class="card">
+      <div class="card-header"><i class="fas fa-pen me-2 text-primary"></i>Submit Feedback</div>
+      <div class="card-body">
+        <form method="POST">
+          <div class="mb-2">
+            <label class="form-label">Your Role</label>
+            <select class="form-select" name="role" required>
+              <option value="">— Select role —</option>
+              <option>Health Officer</option>
+              <option>Field Officer</option>
+              <option>Public Health Analyst</option>
+              <option>Administrator</option>
+            </select>
+          </div>
+          <div class="mb-2">
+            <label class="form-label">Name (optional)</label>
+            <input type="text" class="form-control" name="name" placeholder="Anonymous">
+          </div>
+          {% set questions = [
+            ('q1', 'Is the risk score understandable?'),
+            ('q2', 'Is the escalation workflow clear?'),
+            ('q3', 'Are recommended actions useful?'),
+            ('q4', 'Is the dashboard easy to use?'),
+          ] %}
+          {% for qname, qlabel in questions %}
+          <div class="mb-2">
+            <label class="form-label">{{ qlabel }}</label>
+            <select class="form-select form-select-sm" name="{{ qname }}" required>
+              <option value="5">5 — Excellent</option>
+              <option value="4">4 — Good</option>
+              <option value="3" selected>3 — Average</option>
+              <option value="2">2 — Poor</option>
+              <option value="1">1 — Very Poor</option>
+            </select>
+          </div>
+          {% endfor %}
+          <div class="mb-3">
+            <label class="form-label">What should be improved?</label>
+            <textarea class="form-control" name="notes" rows="2" placeholder="Optional comments…"></textarea>
+          </div>
+          <button type="submit" class="btn btn-primary w-100">
+            <i class="fas fa-paper-plane me-1"></i>Submit Feedback
+          </button>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Results -->
+  <div class="col-lg-8">
+    <!-- Averages + radar -->
+    <div class="card mb-3">
+      <div class="card-header"><i class="fas fa-chart-radar me-2 text-primary"></i>Average Scores ({{ feedbacks | length }} responses)</div>
+      <div class="card-body">
+        <div class="row align-items-center">
+          <div class="col-md-5">
+            {% set qmap = [
+              ('Risk Understandable', averages.q1),
+              ('Escalation Clear', averages.q2),
+              ('Actions Useful', averages.q3),
+              ('Dashboard Easy', averages.q4),
+            ] %}
+            {% for label, avg in qmap %}
+            <div class="mb-3">
+              <div class="d-flex justify-content-between mb-1">
+                <span style="font-size:13px;font-weight:600">{{ label }}</span>
+                <span style="font-size:13px;color:#1a56db;font-weight:700">{{ avg }}/5</span>
+              </div>
+              <div class="risk-bar">
+                <div class="risk-bar-fill fill-{{ 'Low' if avg >= 4 else ('Medium' if avg >= 3 else 'High') }}"
+                     style="width:{{ (avg / 5) * 100 }}%"></div>
+              </div>
+            </div>
+            {% endfor %}
+          </div>
+          <div class="col-md-7">
+            <canvas id="feedbackRadar" height="220"></canvas>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Feedback cards -->
+    <div class="card">
+      <div class="card-header"><i class="fas fa-list me-2 text-primary"></i>Individual Responses</div>
+      <div class="card-body">
+        <div class="alert alert-info py-2 mb-3" style="font-size:12px">
+          <i class="fas fa-tag me-1"></i>
+          Sample prototype validation responses — not real user interview data.
+        </div>
+
+        <!-- Summary -->
+        <div class="row g-2 mb-3">
+          <div class="col-md-4">
+            <div style="background:#f0fdf4;border-radius:8px;padding:12px;border:1px solid #bbf7d0">
+              <div class="fw-700 small text-low mb-1">✓ Positive Feedback</div>
+              <ul class="mb-0" style="font-size:12.5px">
+                <li>Transparent risk scoring builds trust</li>
+                <li>Map view supports rapid field briefings</li>
+                <li>Override audit trail ensures accountability</li>
+                <li>Escalation workflow is logically structured</li>
+              </ul>
+            </div>
+          </div>
+          <div class="col-md-4">
+            <div style="background:#fef2f2;border-radius:8px;padding:12px;border:1px solid #fecaca">
+              <div class="fw-700 small text-high mb-1">⚠ Problems Identified</div>
+              <ul class="mb-0" style="font-size:12.5px">
+                <li>Mobile alert integration missing</li>
+                <li>Historical trend lines needed</li>
+                <li>Escalation workflow could be clearer for new users</li>
+              </ul>
+            </div>
+          </div>
+          <div class="col-md-4">
+            <div style="background:#eff6ff;border-radius:8px;padding:12px;border:1px solid #bfdbfe">
+              <div class="fw-700 small text-primary mb-1">🔧 Changes Made</div>
+              <ul class="mb-0" style="font-size:12.5px">
+                <li>Visual escalation workflow diagram added</li>
+                <li>Risk score breakdown per indicator shown</li>
+                <li>Plain language messages enforced (SC-06)</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+
+        <!-- Individual rows -->
+        {% for fb in feedbacks %}
+        <div class="mb-2 p-3" style="background:#f8fafc;border-radius:8px;border:1px solid #e2e8f0">
+          <div class="d-flex justify-content-between align-items-start mb-1">
+            <div>
+              <strong>{{ fb.respondent_name or 'Anonymous' }}</strong>
+              <span class="badge bg-secondary ms-1" style="font-size:11px">{{ fb.respondent_role }}</span>
+            </div>
+            <small class="text-muted">{{ fb.submitted_at[:10] }}</small>
+          </div>
+          <div class="d-flex gap-3 mb-2" style="font-size:12px;color:#64748b">
+            <span>Risk: <strong>{{ fb.q_risk_understandable }}/5</strong></span>
+            <span>Escalation: <strong>{{ fb.q_escalation_clear }}/5</strong></span>
+            <span>Actions: <strong>{{ fb.q_actions_useful }}/5</strong></span>
+            <span>Dashboard: <strong>{{ fb.q_dashboard_easy }}/5</strong></span>
+          </div>
+          {% if fb.improvement_notes %}
+          <div style="font-size:12.5px;color:#475569;font-style:italic">"{{ fb.improvement_notes }}"</div>
+          {% endif %}
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const avg = {{ averages | tojson }};
+document.addEventListener('DOMContentLoaded', () => initFeedbackRadar('feedbackRadar', avg));
+</script>
+{% endblock %}

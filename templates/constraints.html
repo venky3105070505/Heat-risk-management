@@ -1,0 +1,113 @@
+{% extends "base.html" %}
+{% block title %}Constraints{% endblock %}
+{% block page_title %}<i class="fas fa-sliders-h me-2 text-primary"></i>System Constraints{% endblock %}
+{% block breadcrumb %}Hard constraints (enforced) and configurable soft constraints{% endblock %}
+
+{% block content %}
+<div class="row g-3">
+  <!-- Hard constraints -->
+  <div class="col-lg-6">
+    <div class="card h-100">
+      <div class="card-header" style="background:#fef2f2;border-bottom:1px solid #fecaca;color:#991b1b">
+        <i class="fas fa-shield-alt me-2"></i>Hard Constraints
+        <span class="badge bg-danger ms-2">{{ hard_constraints | length }} enforced</span>
+      </div>
+      <div class="card-body">
+        <p class="text-muted small mb-3">
+          These constraints are <strong>non-negotiable</strong> and enforced in code.
+          They cannot be disabled by any user, regardless of role.
+        </p>
+        {% for hc in hard_constraints %}
+        <div class="constraint-card constraint-hard">
+          <div class="constraint-id">{{ hc.id }}</div>
+          <div class="constraint-name">{{ hc.name }}</div>
+          <div class="constraint-desc">{{ hc.description }}</div>
+          <div class="constraint-enf"><i class="fas fa-code me-1"></i>{{ hc.enforcement }}</div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+
+  <!-- Soft constraints -->
+  <div class="col-lg-6">
+    <div class="card h-100">
+      <div class="card-header" style="background:#eff6ff;border-bottom:1px solid #bfdbfe;color:#1e40af">
+        <i class="fas fa-sliders-h me-2"></i>Soft Constraints
+        <span class="badge bg-primary ms-2">Configurable</span>
+      </div>
+      <div class="card-body">
+        <p class="text-muted small mb-3">
+          Soft constraints are <strong>adjustable priorities</strong>. Authorised staff can tune
+          their weights to reflect current operational context. Changes are logged.
+        </p>
+        <form method="POST">
+          {% for sc in soft_constraints %}
+          <div class="constraint-card constraint-soft mb-2">
+            <div class="constraint-id">{{ sc.id }}</div>
+            <div class="constraint-name">{{ sc.name }}</div>
+            <div class="constraint-desc mb-2">{{ sc.description }}</div>
+            <div class="d-flex align-items-center gap-3">
+              <input type="range" class="soft-slider" id="{{ sc.id }}"
+                     name="{{ sc.id }}" min="0" max="1" step="0.1"
+                     value="{{ soft_weights.get(sc.id, sc.default_weight) }}">
+              <span class="slider-value" id="{{ sc.id }}_val">
+                {{ '%.1f' % soft_weights.get(sc.id, sc.default_weight) }}
+              </span>
+            </div>
+          </div>
+          {% endfor %}
+
+          {% if session.role in ('Health Officer', 'Administrator') %}
+          <button type="submit" class="btn btn-primary w-100 mt-2">
+            <i class="fas fa-save me-1"></i>Save Soft Constraint Weights
+          </button>
+          {% else %}
+          <div class="alert alert-warning py-2 mt-2" style="font-size:12.5px">
+            <i class="fas fa-lock me-1"></i>
+            Only Health Officers and Administrators can adjust soft constraint weights.
+          </div>
+          {% endif %}
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Constraint interaction -->
+<div class="card mt-3">
+  <div class="card-header"><i class="fas fa-info-circle me-2 text-primary"></i>How Constraints Interact</div>
+  <div class="card-body">
+    <div class="row g-3">
+      <div class="col-md-4">
+        <div style="background:#f8fafc;border-radius:10px;padding:16px;height:100%">
+          <div class="fw-700 mb-2">Hard Overrides Soft</div>
+          <p class="text-muted small mb-0">
+            If a hard constraint (e.g., HC-08 missing data) is triggered,
+            soft constraint priorities have no effect. The hard constraint response
+            takes precedence unconditionally.
+          </p>
+        </div>
+      </div>
+      <div class="col-md-4">
+        <div style="background:#f8fafc;border-radius:10px;padding:16px;height:100%">
+          <div class="fw-700 mb-2">Soft Shapes Priority Queue</div>
+          <p class="text-muted small mb-0">
+            Soft constraints influence which neighbourhoods are prioritised in the
+            communication and response queue when multiple areas need attention simultaneously.
+          </p>
+        </div>
+      </div>
+      <div class="col-md-4">
+        <div style="background:#f8fafc;border-radius:10px;padding:16px;height:100%">
+          <div class="fw-700 mb-2">All Changes Audited</div>
+          <p class="text-muted small mb-0">
+            Any modification to soft constraint weights is recorded in the audit log
+            with the user, timestamp, and previous/new values. Accountability is maintained.
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

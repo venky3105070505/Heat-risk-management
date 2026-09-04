@@ -1,0 +1,201 @@
+{% extends "base.html" %}
+{% block title %}Data Quality{% endblock %}
+{% block page_title %}<i class="fas fa-clipboard-list me-2 text-primary"></i>Data Quality Report{% endblock %}
+{% block breadcrumb %}Pre-computation data validation — checked before every risk classification{% endblock %}
+
+{% block content %}
+<!-- Summary KPIs -->
+<div class="row g-3 mb-4">
+  <div class="col-6 col-md-3 col-lg-2">
+    <div class="stat-card"><div class="stat-number">{{ summary.total }}</div><div class="stat-label">Total Records</div></div>
+  </div>
+  <div class="col-6 col-md-3 col-lg-2">
+    <div class="stat-card" style="border-left:4px solid #22c55e">
+      <div class="stat-number" style="color:#22c55e">{{ summary.ok }}</div><div class="stat-label">Fully Valid</div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3 col-lg-2">
+    <div class="stat-card" style="border-left:4px solid #f97316">
+      <div class="stat-number" style="color:#f97316">{{ summary.warning }}</div><div class="stat-label">Warnings</div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3 col-lg-2">
+    <div class="stat-card" style="border-left:4px solid #ef4444">
+      <div class="stat-number" style="color:#ef4444">{{ summary.critical }}</div><div class="stat-label">Critical Issues</div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3 col-lg-2">
+    <div class="stat-card" style="border-left:4px solid #f59e0b">
+      <div class="stat-number" style="color:#f59e0b">{{ summary.missing_any }}</div><div class="stat-label">Missing Fields</div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3 col-lg-2">
+    <div class="stat-card" style="border-left:4px solid #1a56db">
+      <div class="stat-number" style="color:#1a56db">{{ summary.avg_quality }}</div><div class="stat-label">Avg Quality Score</div>
+    </div>
+  </div>
+</div>
+
+<!-- Quality donut context -->
+<div class="row g-3 mb-4">
+  <div class="col-md-4">
+    <div class="card h-100">
+      <div class="card-header"><i class="fas fa-chart-pie me-2 text-primary"></i>Quality Distribution</div>
+      <div class="card-body" style="max-height:220px">
+        <canvas id="qualityDonut"></canvas>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-8">
+    <div class="card h-100">
+      <div class="card-header"><i class="fas fa-info-circle me-2 text-primary"></i>What is Checked</div>
+      <div class="card-body">
+        <div class="row g-2">
+          {% for check in [
+            ('Missing Values','Temperature, vulnerability score, service access, built environment score must not be NULL or NaN.','fas fa-exclamation-circle','text-warning'),
+            ('Duplicate Records','neighbourhood_id must be unique across all records.','fas fa-copy','text-primary'),
+            ('Invalid Values','Vulnerability score must be in [0,100]. Temperature must be > 0.','fas fa-times-circle','text-danger'),
+            ('Extreme Outliers','Temperature > 52°C is outside plausible range — likely sensor error.','fas fa-bolt','text-warning'),
+            ('Quality Score','100 points minus penalties: 20 per missing, 15 per invalid, 10 per outlier.','fas fa-star','text-success'),
+          ] %}
+          <div class="col-md-6">
+            <div style="background:#f8fafc;border-radius:8px;padding:10px 12px;font-size:12.5px">
+              <div class="fw-700 mb-1"><i class="{{ check[2] }} {{ check[3] }} me-1"></i>{{ check[0] }}</div>
+              <div style="color:#64748b">{{ check[1] }}</div>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Data Table -->
+<div class="card">
+  <div class="card-header d-flex justify-content-between align-items-center">
+    <span><i class="fas fa-table me-2 text-primary"></i>Record-Level Quality Report</span>
+    <div class="d-flex gap-2 align-items-center">
+      <input type="text" id="dqSearch" class="form-control form-control-sm" placeholder="Search..." style="width:200px">
+      <a href="{{ url_for('api_data_quality') }}" class="btn btn-sm btn-outline-secondary" target="_blank">
+        <i class="fas fa-code me-1"></i>JSON API
+      </a>
+    </div>
+  </div>
+  <div class="card-body p-0">
+    <div style="overflow-x:auto">
+      <table class="table table-hover mb-0" id="dqTable">
+        <thead style="background:#f8fafc">
+          <tr>
+            <th>ID</th><th>Neighbourhood</th><th>Risk Level</th>
+            <th>Quality Score</th><th>Status</th>
+            <th>Missing</th><th>Invalid</th><th>Outliers</th><th>Issues</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for r in report %}
+          <tr>
+            <td><small class="text-muted">{{ r.neighbourhood_id }}</small></td>
+            <td>
+              <a href="{{ url_for('neighbourhood_detail', nb_id=r.neighbourhood_id) }}"
+                 style="text-decoration:none;font-weight:600">
+                {{ r.neighbourhood_name }}
+              </a>
+            </td>
+            <td>
+              <span class="badge-risk badge-{{ r.risk_level }}">{{ r.risk_level }}</span>
+            </td>
+            <td>
+              <div style="display:flex;align-items:center;gap:8px">
+                <div style="background:#e2e8f0;border-radius:4px;height:8px;width:80px;overflow:hidden">
+                  <div style="width:{{ r.quality_score }}%;height:8px;background:{{ '#22c55e' if r.quality_score>=80 else ('#f97316' if r.quality_score>=60 else '#ef4444') }};border-radius:4px"></div>
+                </div>
+                <span style="font-weight:700;font-size:13px;color:{{ '#22c55e' if r.quality_score>=80 else ('#f97316' if r.quality_score>=60 else '#ef4444') }}">
+                  {{ r.quality_score }}
+                </span>
+              </div>
+            </td>
+            <td>
+              {% if r.status == 'OK' %}
+                <span class="badge bg-success">OK</span>
+              {% elif r.status == 'WARNING' %}
+                <span class="badge bg-warning text-dark">Warning</span>
+              {% else %}
+                <span class="badge bg-danger">Critical</span>
+              {% endif %}
+            </td>
+            <td>
+              {% if r.missing_count > 0 %}
+                <span class="badge bg-warning text-dark">{{ r.missing_count }}</span>
+              {% else %}
+                <span class="text-muted">0</span>
+              {% endif %}
+            </td>
+            <td>
+              {% if r.invalid_count > 0 %}
+                <span class="badge bg-danger">{{ r.invalid_count }}</span>
+              {% else %}
+                <span class="text-muted">0</span>
+              {% endif %}
+            </td>
+            <td>
+              {% if r.outlier_count > 0 %}
+                <span class="badge bg-warning text-dark">{{ r.outlier_count }}</span>
+              {% else %}
+                <span class="text-muted">0</span>
+              {% endif %}
+            </td>
+            <td>
+              {% if r.issues %}
+                <details>
+                  <summary style="cursor:pointer;font-size:12px;color:#1a56db">
+                    {{ r.issues|length }} issue(s)
+                  </summary>
+                  <ul style="font-size:11.5px;margin:4px 0 0 0;padding-left:16px;color:#64748b">
+                    {% for issue in r.issues %}
+                      <li>{{ issue }}</li>
+                    {% endfor %}
+                  </ul>
+                </details>
+              {% else %}
+                <span class="text-muted small">None</span>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Search filter
+document.getElementById('dqSearch').addEventListener('input', function() {
+  const q = this.value.toLowerCase();
+  document.querySelectorAll('#dqTable tbody tr').forEach(row => {
+    row.style.display = row.textContent.toLowerCase().includes(q) ? '' : 'none';
+  });
+});
+
+// Quality donut chart
+const ctx = document.getElementById('qualityDonut').getContext('2d');
+new Chart(ctx, {
+  type: 'doughnut',
+  data: {
+    labels: ['Valid', 'Warning', 'Critical'],
+    datasets: [{
+      data: [{{ summary.ok }}, {{ summary.warning }}, {{ summary.critical }}],
+      backgroundColor: ['#22c55e','#f97316','#ef4444'],
+      borderWidth: 2, borderColor: '#fff'
+    }]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: true,
+    plugins: { legend: { position: 'bottom', labels: { font: { family: 'Inter', size: 12 } } } }
+  }
+});
+</script>
+{% endblock %}

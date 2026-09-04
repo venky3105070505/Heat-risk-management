@@ -1,0 +1,219 @@
+{% extends "base.html" %}
+{% block title %}Escalation Workflow{% endblock %}
+{% block page_title %}<i class="fas fa-exclamation-triangle me-2 text-high"></i>Escalation Workflow{% endblock %}
+{% block breadcrumb %}Visual escalation process and active escalations{% endblock %}
+
+{% block content %}
+<div class="row g-3">
+  <!-- Workflow diagram -->
+  <div class="col-lg-5">
+    <div class="card mb-3">
+      <div class="card-header"><i class="fas fa-project-diagram me-2 text-primary"></i>Escalation Process</div>
+      <div class="card-body">
+        <!-- LOW -->
+        <div style="border-left:4px solid #22c55e;padding:0 0 0 14px;margin-bottom:18px">
+          <div class="fw-700 mb-2" style="color:#15803d">🟢 LOW RISK</div>
+          <div class="esc-flow">
+            <div class="esc-step">
+              <div class="esc-dot esc-dot-low"><i class="fas fa-check"></i></div>
+              <div class="esc-content">
+                <div class="esc-title">Standard Advisory Issued</div>
+                <div class="esc-sub">General heat safety communication</div>
+              </div>
+            </div>
+            <div class="esc-step">
+              <div class="esc-dot esc-dot-low"><i class="fas fa-eye"></i></div>
+              <div class="esc-content">
+                <div class="esc-title">Routine Monitoring</div>
+                <div class="esc-sub">Weekly data refresh and re-assessment</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- MEDIUM -->
+        <div style="border-left:4px solid #f97316;padding:0 0 0 14px;margin-bottom:18px">
+          <div class="fw-700 mb-2" style="color:#c2410c">🟠 MEDIUM RISK</div>
+          <div class="esc-flow">
+            <div class="esc-step">
+              <div class="esc-dot esc-dot-medium"><i class="fas fa-bullhorn"></i></div>
+              <div class="esc-content"><div class="esc-title">Targeted Advisory</div><div class="esc-sub">Preventive communication sent</div></div>
+            </div>
+            <div class="esc-step">
+              <div class="esc-dot esc-dot-medium"><i class="fas fa-user-check"></i></div>
+              <div class="esc-content"><div class="esc-title">Field Officer Review</div><div class="esc-sub"><em class="human-review-flag"><i class="fas fa-user"></i> Human Review Point</em></div></div>
+            </div>
+            <div class="esc-step">
+              <div class="esc-dot esc-dot-medium"><i class="fas fa-eye"></i></div>
+              <div class="esc-content"><div class="esc-title">Bi-weekly Monitoring</div><div class="esc-sub">Escalate if no improvement</div></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- HIGH -->
+        <div style="border-left:4px solid #ef4444;padding:0 0 0 14px;margin-bottom:18px">
+          <div class="fw-700 mb-2" style="color:#dc2626">🔴 HIGH RISK</div>
+          <div class="esc-flow">
+            <div class="esc-step">
+              <div class="esc-dot esc-dot-high"><i class="fas fa-user-md"></i></div>
+              <div class="esc-content"><div class="esc-title">Health Officer Review</div><div class="esc-sub"><em class="human-review-flag"><i class="fas fa-user"></i> MANDATORY Human Review (HC-03)</em></div></div>
+            </div>
+            <div class="esc-step">
+              <div class="esc-dot esc-dot-high"><i class="fas fa-broadcast-tower"></i></div>
+              <div class="esc-content"><div class="esc-title">Urgent Communication</div><div class="esc-sub">All available channels activated</div></div>
+            </div>
+            <div class="esc-step">
+              <div class="esc-dot esc-dot-high"><i class="fas fa-walking"></i></div>
+              <div class="esc-content"><div class="esc-title">Field Response Deployed</div><div class="esc-sub">On-ground health workers dispatched</div></div>
+            </div>
+            <div class="esc-step">
+              <div class="esc-dot esc-dot-high"><i class="fas fa-redo"></i></div>
+              <div class="esc-content"><div class="esc-title">Follow-up within 24h</div><div class="esc-sub">Outcome recorded and logged</div></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- AMBIGUOUS -->
+        <div style="border-left:4px solid #a855f7;padding:0 0 0 14px;margin-bottom:18px">
+          <div class="fw-700 mb-2" style="color:#7e22ce">🟣 AMBIGUOUS CASE</div>
+          <div class="esc-flow">
+            <div class="esc-step">
+              <div class="esc-dot esc-dot-ambig"><i class="fas fa-search"></i></div>
+              <div class="esc-content"><div class="esc-title">Manual Review Queue</div><div class="esc-sub">Sent to Health Officer immediately</div></div>
+            </div>
+            <div class="esc-step">
+              <div class="esc-dot esc-dot-ambig"><i class="fas fa-gavel"></i></div>
+              <div class="esc-content"><div class="esc-title">Health Officer Decision</div><div class="esc-sub"><em class="human-review-flag"><i class="fas fa-user"></i> Human Review Point</em></div></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- EMERGENCY -->
+        <div style="border-left:4px solid #0f172a;padding:0 0 0 14px">
+          <div class="fw-700 mb-2" style="color:#0f172a">⚫ EMERGENCY CASE (Score ≥ 90)</div>
+          <div class="esc-flow">
+            <div class="esc-step">
+              <div class="esc-dot esc-dot-emerg"><i class="fas fa-bolt"></i></div>
+              <div class="esc-content"><div class="esc-title">Immediate Escalation (HC-04)</div><div class="esc-sub">Automatic — cannot be bypassed</div></div>
+            </div>
+            <div class="esc-step">
+              <div class="esc-dot esc-dot-emerg"><i class="fas fa-user-tie"></i></div>
+              <div class="esc-content"><div class="esc-title">Senior Health Officer / Admin</div><div class="esc-sub"><em class="human-review-flag" style="background:#1e293b;color:#f8fafc;border-color:#334155"><i class="fas fa-user"></i> Mandatory Senior Review</em></div></div>
+            </div>
+            <div class="esc-step">
+              <div class="esc-dot esc-dot-emerg"><i class="fas fa-ambulance"></i></div>
+              <div class="esc-content"><div class="esc-title">Emergency Response Activated</div><div class="esc-sub">Coordinated with emergency services</div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Active escalations -->
+  <div class="col-lg-7">
+    <div class="card">
+      <div class="card-header"><i class="fas fa-list me-2 text-high"></i>Active Escalations ({{ escalations | length }})</div>
+      <div class="table-container">
+        <table class="hrt-table">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Neighbourhood</th>
+              <th>Risk</th>
+              <th>Type</th>
+              <th>State</th>
+              <th>Reason</th>
+              <th>Escalated By</th>
+              <th>Status</th>
+              <th>Date</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for e in escalations %}
+            <tr class="row-{{ e.risk_level }}">
+              <td style="font-size:12px;color:#64748b">{{ e.id }}</td>
+              <td><a href="{{ url_for('neighbourhood_detail', nb_id=e.neighbourhood_id) }}"
+                     style="font-weight:600;color:inherit;text-decoration:none">
+                {{ e.neighbourhood_name }}</a></td>
+              <td><strong>{{ e.risk_score or 'N/A' }}</strong></td>
+              <td style="font-size:12px">{{ e.escalation_type or 'High Risk' }}</td>
+              <td>
+                <span class="badge" style="background:#1a56db;font-size:11px">
+                  {{ e.current_state or e.status }}
+                </span>
+              </td>
+              <td style="font-size:12px;max-width:150px">{{ e.reason }}</td>
+              <td style="font-size:12px">{{ e.escalated_by_name or 'System' }}</td>
+              <td><span class="badge badge-status-{{ e.status }}" style="font-size:11px">{{ e.status }}</span></td>
+              <td style="font-size:12px;white-space:nowrap">{{ e.created_at[:10] }}</td>
+              <td>
+                {% if e.status == 'Open' or e.status == 'Under Review' %}
+                <button class="btn btn-sm btn-success" data-bs-toggle="modal"
+                        data-bs-target="#resolveModal"
+                        data-esc-id="{{ e.id }}"
+                        data-esc-name="{{ e.neighbourhood_name }}">
+                  <i class="fas fa-check me-1"></i>Resolve
+                </button>
+                {% else %}
+                <span class="text-muted small">Resolved</span>
+                {% endif %}
+              </td>
+            </tr>
+            {% else %}
+            <tr><td colspan="10" class="text-center text-muted py-4">No escalations found.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Resolve Modal -->
+<div class="modal fade" id="resolveModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title"><i class="fas fa-check-circle me-2 text-success"></i>Resolve Escalation</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <form method="POST">
+        <div class="modal-body">
+          <input type="hidden" name="action" value="resolve">
+          <input type="hidden" name="escalation_id" id="resolveEscId">
+          <div class="alert alert-warning py-2" style="font-size:13px">
+            <i class="fas fa-exclamation-triangle me-1"></i>
+            This will permanently mark the escalation as <strong>Resolved</strong> and log the action.
+          </div>
+          <div id="resolveEscName" class="fw-700 mb-3" style="font-size:14px"></div>
+          <div class="mb-3">
+            <label class="form-label">Resolution Notes <span class="text-danger">*</span></label>
+            <textarea class="form-control" name="resolution_notes" rows="3"
+              placeholder="Describe how this escalation was resolved…" required></textarea>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-success">
+            <i class="fas fa-check me-1"></i>Mark Resolved & Log
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const resolveModal = document.getElementById('resolveModal');
+resolveModal.addEventListener('show.bs.modal', function(e) {
+  const btn = e.relatedTarget;
+  document.getElementById('resolveEscId').value   = btn.dataset.escId;
+  document.getElementById('resolveEscName').textContent = 'Neighbourhood: ' + btn.dataset.escName;
+});
+</script>
+{% endblock %}
+

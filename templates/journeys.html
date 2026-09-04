@@ -1,0 +1,252 @@
+{% extends "base.html" %}
+{% block title %}Case Journeys{% endblock %}
+{% block page_title %}<i class="fas fa-route me-2 text-primary"></i>Case Journeys{% endblock %}
+{% block breadcrumb %}Two resident journey walkthroughs — aggregate fictional scenarios (no personal data){% endblock %}
+
+{% block content %}
+<div class="alert alert-info py-2 mb-3" role="alert" style="font-size:13px">
+  <i class="fas fa-info-circle me-2"></i>
+  <strong>Note:</strong> These journeys use fictional aggregate neighbourhood scenarios only.
+  No personally identifiable resident or patient data is stored or displayed.
+</div>
+
+<div class="row g-3">
+  <!-- Journey 1 -->
+  <div class="col-lg-6">
+    <div class="card h-100">
+      <div class="card-header" style="background:#f0fdf4;border-bottom:1px solid #bbf7d0">
+        <i class="fas fa-map-signs me-2 text-low"></i>
+        <strong>Journey 1 — Lower Urgency</strong>
+        {% if j1 %}
+          <span class="badge-risk badge-{{ j1.risk_level }} ms-2">{{ j1.risk_level }}</span>
+        {% endif %}
+      </div>
+      <div class="card-body">
+        {% if j1 %}
+        <div style="background:#f8fafc;border-radius:8px;padding:12px;margin-bottom:16px;font-size:13px">
+          <strong>Scenario:</strong> Residents of <strong>{{ j1.neighbourhood_name }}</strong>
+          — a {{ j1.risk_level }}-risk neighbourhood with temperature {{ j1.temperature or 'N/A' }}°C,
+          vulnerability score {{ j1.vulnerability_score or 'N/A' }}, and service access {{ j1.service_access_score or 'N/A' }}.
+          Risk score: <strong>{{ j1.risk_score or 'N/A' }}</strong>.
+        </div>
+        {% endif %}
+
+        <div class="timeline">
+          <div class="timeline-item">
+            <div class="timeline-dot action"></div>
+            <div class="timeline-body">
+              <div class="step-label" style="color:#3b82f6">STEP 1 — Data Collection</div>
+              <strong>Neighbourhood Data Received</strong>
+              <p class="mb-0 text-muted" style="font-size:12.5px">
+                Aggregate indicators collected: temperature, humidity, vulnerability, built environment, service access.
+                No individual resident data used.
+              </p>
+            </div>
+          </div>
+          <div class="timeline-item">
+            <div class="timeline-dot action"></div>
+            <div class="timeline-body">
+              <div class="step-label" style="color:#3b82f6">STEP 2 — Risk Calculation</div>
+              <strong>Transparent Risk Score Computed</strong>
+              <p class="mb-0 text-muted" style="font-size:12.5px">
+                Score = (Climate×35%) + (Vulnerability×30%) + (Built Env.×20%) + (Service Risk×15%).
+                All hard constraints checked — no missing data flags.
+              </p>
+            </div>
+          </div>
+          <div class="timeline-item">
+            <div class="timeline-dot success"></div>
+            <div class="timeline-body">
+              <div class="step-label" style="color:#22c55e">STEP 3 — Classification</div>
+              <strong>Classified as {{ j1.risk_level if j1 else 'Low/Medium' }} Risk</strong>
+              <p class="mb-0 text-muted" style="font-size:12.5px">
+                Automatic classification allowed (no constraint violations).
+                No mandatory human review required for Low risk.
+              </p>
+              {% if j1 and j1.risk_level == 'Medium' %}
+              <div class="human-review-flag mt-1">
+                <i class="fas fa-user"></i> Field Officer review recommended for Medium risk
+              </div>
+              {% endif %}
+            </div>
+          </div>
+          <div class="timeline-item">
+            <div class="timeline-dot action"></div>
+            <div class="timeline-body">
+              <div class="step-label" style="color:#3b82f6">STEP 4 — Communication</div>
+              <strong>{{ 'Targeted Preventive' if (j1 and j1.risk_level=='Medium') else 'General Heat Safety' }} Advisory Sent</strong>
+              <p class="mb-0 text-muted" style="font-size:12.5px">
+                Channels: SMS + {{ 'Local Health Worker Outreach + Community Centre Notice' if (j1 and j1.risk_level=='Medium') else 'Social Media Advisory' }}.
+                Message in plain language (Grade 8 reading level).
+              </p>
+            </div>
+          </div>
+          <div class="timeline-item">
+            <div class="timeline-dot success"></div>
+            <div class="timeline-body">
+              <div class="step-label" style="color:#22c55e">STEP 5 — Monitoring</div>
+              <strong>Ongoing Monitoring — No Escalation</strong>
+              <p class="mb-0 text-muted" style="font-size:12.5px">
+                Data refreshed {{ 'bi-weekly' if (j1 and j1.risk_level=='Medium') else 'weekly' }}.
+                No escalation triggered. Outcome: residents informed and monitoring continues.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div class="mt-3 p-3" style="background:#f0fdf4;border-radius:8px;border:1px solid #bbf7d0;font-size:12.5px">
+          <strong>Human Review Points in this Journey:</strong>
+          <ul class="mb-0 mt-1">
+            {% if j1 and j1.risk_level == 'Medium' %}
+            <li><span class="human-review-flag" style="display:inline-flex"><i class="fas fa-user"></i>Field Officer review recommended</span></li>
+            {% else %}
+            <li>No mandatory review required for Low risk</li>
+            {% endif %}
+            <li>Data validation before risk calculation</li>
+          </ul>
+        </div>
+
+        {% if j1 %}
+        <div class="mt-2 text-end">
+          <a href="{{ url_for('neighbourhood_detail', nb_id=j1.neighbourhood_id) }}"
+             class="btn btn-sm btn-outline-success">
+            <i class="fas fa-external-link-alt me-1"></i>View {{ j1.neighbourhood_name }}
+          </a>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <!-- Journey 2 -->
+  <div class="col-lg-6">
+    <div class="card h-100">
+      <div class="card-header" style="background:#fef2f2;border-bottom:1px solid #fecaca">
+        <i class="fas fa-fire me-2 text-high"></i>
+        <strong>Journey 2 — High Urgency</strong>
+        {% if j2 %}
+          <span class="badge-risk badge-High ms-2">High</span>
+        {% endif %}
+      </div>
+      <div class="card-body">
+        {% if j2 %}
+        <div style="background:#fef2f2;border-radius:8px;padding:12px;margin-bottom:16px;font-size:13px;border:1px solid #fecaca">
+          <strong>Scenario:</strong> Residents of <strong>{{ j2.neighbourhood_name }}</strong>
+          — HIGH-risk area with temperature <strong>{{ j2.temperature or 'N/A' }}°C</strong>,
+          vulnerability score <strong>{{ j2.vulnerability_score or 'N/A' }}</strong>,
+          service access <strong>{{ j2.service_access_score or 'N/A' }}</strong>.
+          Risk score: <strong class="text-high">{{ j2.risk_score or 'N/A' }}</strong>.
+        </div>
+        {% endif %}
+
+        <div class="timeline">
+          <div class="timeline-item">
+            <div class="timeline-dot action"></div>
+            <div class="timeline-body">
+              <div class="step-label" style="color:#3b82f6">STEP 1 — Data Detection</div>
+              <strong>High-Temperature & High-Vulnerability Detected</strong>
+              <p class="mb-0 text-muted" style="font-size:12.5px">
+                System detects critical combination: extreme heat + vulnerable population + poor service access.
+                All aggregate-level data — no individual records.
+              </p>
+            </div>
+          </div>
+          <div class="timeline-item">
+            <div class="timeline-dot alert"></div>
+            <div class="timeline-body">
+              <div class="step-label" style="color:#ef4444">STEP 2 — High-Risk Flag</div>
+              <strong>🚨 Risk Score ≥ 70 — High Risk Classified</strong>
+              <p class="mb-0 text-muted" style="font-size:12.5px">
+                Hard Constraint HC-03 triggered automatically: review queue entry created.
+                Automatic closure blocked (HC-02). Communication held pending human review.
+              </p>
+            </div>
+          </div>
+          <div class="timeline-item">
+            <div class="timeline-dot human-review"></div>
+            <div class="timeline-body">
+              <div class="step-label" style="color:#f97316">STEP 3 — MANDATORY HUMAN REVIEW</div>
+              <strong>Health Officer Review</strong>
+              <div class="human-review-flag mt-1 mb-1">
+                <i class="fas fa-user"></i> HC-03: Mandatory Health Officer review before any action
+              </div>
+              <p class="mb-0 text-muted" style="font-size:12.5px">
+                Health Officer reviews risk breakdown, verifies data quality, assesses field context.
+                Approves, modifies, or escalates.
+              </p>
+            </div>
+          </div>
+          <div class="timeline-item">
+            <div class="timeline-dot alert"></div>
+            <div class="timeline-body">
+              <div class="step-label" style="color:#ef4444">STEP 4 — Urgent Communication</div>
+              <strong>All Channels Activated</strong>
+              <p class="mb-0 text-muted" style="font-size:12.5px">
+                SMS + Public Announcement + Health Worker Outreach + Phone Outreach + Community Centre.
+                Message: plain language, simple, actionable — Grade 8 level.
+              </p>
+            </div>
+          </div>
+          <div class="timeline-item">
+            <div class="timeline-dot alert"></div>
+            <div class="timeline-body">
+              <div class="step-label" style="color:#ef4444">STEP 5 — Field Response</div>
+              <strong>Field Outreach Team Dispatched</strong>
+              <p class="mb-0 text-muted" style="font-size:12.5px">
+                Health workers door-knock high-vulnerability clusters.
+                Cooling centre availability confirmed. Field officer logs outcome.
+              </p>
+              <div class="human-review-flag mt-1">
+                <i class="fas fa-user"></i> Field Officer review point
+              </div>
+            </div>
+          </div>
+          <div class="timeline-item">
+            <div class="timeline-dot human-review"></div>
+            <div class="timeline-body">
+              <div class="step-label" style="color:#f97316">STEP 6 — Escalation (if needed)</div>
+              <strong>Emergency Escalation Available</strong>
+              <p class="mb-0 text-muted" style="font-size:12.5px">
+                If risk score ≥ 90 OR no improvement after 24h, case escalated to Senior Health Officer.
+                HC-04 ensures emergency cases cannot be ignored.
+              </p>
+              <div class="human-review-flag mt-1" style="background:#1e293b;color:#f8fafc;border-color:#334155">
+                <i class="fas fa-user"></i> Senior Health Officer / Admin review
+              </div>
+            </div>
+          </div>
+          <div class="timeline-item">
+            <div class="timeline-dot success"></div>
+            <div class="timeline-body">
+              <div class="step-label" style="color:#22c55e">STEP 7 — Follow-up</div>
+              <strong>24h Follow-up + Outcome Logging</strong>
+              <p class="mb-0 text-muted" style="font-size:12.5px">
+                All actions logged in audit trail. Communication reach recorded.
+                Re-assessment scheduled within 48h. Neighbourhood remains monitored.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div class="mt-3 p-3" style="background:#fef2f2;border-radius:8px;border:1px solid #fecaca;font-size:12.5px">
+          <strong>Human Review Points in this Journey:</strong>
+          <ul class="mb-0 mt-1">
+            <li><span class="human-review-flag" style="display:inline-flex"><i class="fas fa-user"></i>HC-03 Mandatory Health Officer review</span></li>
+            <li><span class="human-review-flag" style="display:inline-flex"><i class="fas fa-user"></i>Field Officer outcome review</span></li>
+            <li><span class="human-review-flag" style="display:inline-flex;background:#1e293b;color:#f8fafc;border-color:#334155"><i class="fas fa-user"></i>HC-04 Emergency escalation (if triggered)</span></li>
+          </ul>
+        </div>
+
+        {% if j2 %}
+        <div class="mt-2 text-end">
+          <a href="{{ url_for('neighbourhood_detail', nb_id=j2.neighbourhood_id) }}"
+             class="btn btn-sm btn-outline-danger">
+            <i class="fas fa-external-link-alt me-1"></i>View {{ j2.neighbourhood_name }}
+          </a>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

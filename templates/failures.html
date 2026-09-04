@@ -1,0 +1,114 @@
+{% extends "base.html" %}
+{% block title %}Failure Mode Analysis{% endblock %}
+{% block page_title %}<i class="fas fa-bug me-2 text-high"></i>Failure Mode Analysis{% endblock %}
+{% block breadcrumb %}5 documented failure cases with detection, impact, response, and escalation{% endblock %}
+
+{% block content %}
+<div class="card mb-3" style="border:1px solid #fecaca">
+  <div class="card-body py-2" style="background:#fef2f2">
+    <div style="font-size:13px;color:#991b1b">
+      <i class="fas fa-shield-alt me-2"></i>
+      <strong>System Resilience:</strong> All failure cases are explicitly handled. The system never silently fails —
+      every edge case triggers detection, human review, or escalation.
+    </div>
+  </div>
+</div>
+
+{% for fc in failure_modes %}
+<div class="failure-card">
+  <div class="failure-header">
+    <div>
+      <div class="failure-id">{{ fc.id }}</div>
+      <div class="failure-name">{{ fc.name }}</div>
+    </div>
+    {% if fc.id == 'FC-03' or fc.id == 'FC-04' %}
+      <span class="badge bg-danger ms-auto">Emergency Risk</span>
+    {% elif fc.id == 'FC-01' %}
+      <span class="badge bg-warning text-dark ms-auto">Data Quality</span>
+    {% elif fc.id == 'FC-02' %}
+      <span class="badge bg-purple ms-auto" style="background:#a855f7">Ambiguous</span>
+    {% else %}
+      <span class="badge bg-secondary ms-auto">Governance</span>
+    {% endif %}
+  </div>
+  <div class="failure-body">
+    <div class="row g-3">
+      <div class="col-md-6">
+        <div class="failure-row">
+          <div class="failure-key">📋 Description</div>
+          <div class="failure-val">{{ fc.description }}</div>
+        </div>
+        <div class="failure-row">
+          <div class="failure-key">🔍 Detection</div>
+          <div class="failure-val"><code style="font-size:12px;color:#7e22ce">{{ fc.detection }}</code></div>
+        </div>
+        <div class="failure-row">
+          <div class="failure-key">⚡ Possible Impact</div>
+          <div class="failure-val" style="color:#dc2626">{{ fc.impact }}</div>
+        </div>
+      </div>
+      <div class="col-md-6">
+        <div class="failure-row">
+          <div class="failure-key">🤖 System Response</div>
+          <div class="failure-val">{{ fc.system_response }}</div>
+        </div>
+        <div class="failure-row">
+          <div class="failure-key"><span class="human-review-flag" style="display:inline-flex"><i class="fas fa-user"></i>Human Review</span></div>
+          <div class="failure-val">{{ fc.human_review }}</div>
+        </div>
+        <div class="failure-row">
+          <div class="failure-key">🚨 Escalation Path</div>
+          <div class="failure-val">{{ fc.escalation }}</div>
+        </div>
+        <div class="failure-row">
+          <div class="failure-key">📍 Example</div>
+          <div class="failure-val"><em class="text-muted">{{ fc.example_nb }}</em></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endfor %}
+
+<!-- Summary table -->
+<div class="card mt-3">
+  <div class="card-header"><i class="fas fa-table me-2 text-primary"></i>Failure Mode Summary</div>
+  <div class="table-container">
+    <table class="hrt-table">
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Failure</th>
+          <th>Detection Method</th>
+          <th>Auto-Classify?</th>
+          <th>Human Review?</th>
+          <th>Escalation?</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% set summary = [
+          ('FC-01', 'Missing Temperature Data',          'Null check pre-scoring',                    'No',  'Yes — Health Officer', 'If other indicators critical'),
+          ('FC-02', 'Conflicting Indicators',            'Combined threshold check',                  'No',  'Yes — Health Officer', 'If temperature extreme 48h+'),
+          ('FC-03', 'No Cooling / Healthcare Services',  'Service access + cooling centre check',     'No',  'Yes — Administrator',  'Immediate emergency escalation'),
+          ('FC-04', 'Extreme Outlier Input Values',      'Extreme value guard (>52°C)',               'No',  'Yes — Data team',      'If confirmed, emergency escalation'),
+          ('FC-05', 'Override Disagreement',             'Override audit log conflict detection',     'No',  'Yes — Administrator',  'Admin final decision, locks further overrides'),
+        ] %}
+        {% for fc_id, name, detection, auto, review, esc in summary %}
+        <tr>
+          <td><code style="font-size:12px">{{ fc_id }}</code></td>
+          <td><strong>{{ name }}</strong></td>
+          <td style="font-size:12px">{{ detection }}</td>
+          <td><span class="badge bg-danger">{{ auto }}</span></td>
+          <td>
+            <span class="human-review-flag" style="display:inline-flex">
+              <i class="fas fa-user"></i>{{ review }}
+            </span>
+          </td>
+          <td style="font-size:12px">{{ esc }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

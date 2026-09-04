@@ -1,0 +1,179 @@
+﻿{% extends "base.html" %}
+{% block title %}Audit Log{% endblock %}
+{% block page_title %}<i class="fas fa-history me-2 text-primary"></i>Audit Log{% endblock %}
+{% block breadcrumb %}All system actions logged — HC-07: every override is recorded and immutable{% endblock %}
+
+{% block content %}
+<style>
+  .action-override  { background:#fef2f2; color:#dc2626; border:1px solid #fecaca; }
+  .action-login     { background:#eff6ff; color:#1d4ed8; border:1px solid #bfdbfe; }
+  .action-sent      { background:#f0fdf4; color:#15803d; border:1px solid #bbf7d0; }
+  .action-escalate  { background:#fff7ed; color:#c2410c; border:1px solid #fed7aa; }
+  .action-update    { background:#faf5ff; color:#7e22ce; border:1px solid #e9d5ff; }
+  .action-default   { background:#f8fafc; color:#475569; border:1px solid #e2e8f0; }
+  .action-badge {
+    display:inline-block; padding:2px 8px; border-radius:20px;
+    font-size:11px; font-weight:700; letter-spacing:.3px; white-space:nowrap;
+  }
+  .log-row td { vertical-align:middle; }
+  .log-row.row-override { border-left:3px solid #ef4444; }
+  .log-row.row-login    { border-left:3px solid #3b82f6; }
+  .log-row.row-sent     { border-left:3px solid #22c55e; }
+  .log-row.row-escalate { border-left:3px solid #f97316; }
+  .log-row.row-update   { border-left:3px solid #a855f7; }
+</style>
+
+{% macro action_class(action) -%}
+  {%- if action and 'OVERRIDE' in action -%}action-override
+  {%- elif action and ('LOGIN' in action or 'LOGOUT' in action) -%}action-login
+  {%- elif action and ('SENT' in action or 'APPROVED' in action or 'EXPORT' in action) -%}action-sent
+  {%- elif action and 'ESCALAT' in action -%}action-escalate
+  {%- elif action and ('UPDATE' in action or 'REVIEW' in action or 'CONSTRAINT' in action) -%}action-update
+  {%- else -%}action-default
+  {%- endif -%}
+{%- endmacro %}
+
+{% macro row_class(action) -%}
+  {%- if action and 'OVERRIDE' in action -%}row-override
+  {%- elif action and ('LOGIN' in action or 'LOGOUT' in action) -%}row-login
+  {%- elif action and ('SENT' in action or 'APPROVED' in action) -%}row-sent
+  {%- elif action and 'ESCALAT' in action -%}row-escalate
+  {%- else -%}row-update
+  {%- endif -%}
+{%- endmacro %}
+
+<div class="row g-3 mb-4">
+  <div class="col-md-3">
+    <div class="stat-card stat-info">
+      <div class="stat-icon"><i class="fas fa-list-alt"></i></div>
+      <div>
+        <div class="stat-value">{{ logs | length }}</div>
+        <div class="stat-label">Total Audit Events</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-3">
+    <div class="stat-card stat-high">
+      <div class="stat-icon"><i class="fas fa-user-shield"></i></div>
+      <div>
+        <div class="stat-value">{{ overrides | length }}</div>
+        <div class="stat-label">Risk Overrides (HC-07)</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-3">
+    <div class="stat-card stat-medium">
+      <div class="stat-icon"><i class="fas fa-sign-in-alt"></i></div>
+      <div>
+        <div class="stat-value">{{ logs | selectattr('action', 'equalto', 'LOGIN') | list | length }}</div>
+        <div class="stat-label">Login Events</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-3">
+    <div class="stat-card stat-low">
+      <div class="stat-icon"><i class="fas fa-paper-plane"></i></div>
+      <div>
+        <div class="stat-value">{{ logs | selectattr('action', 'equalto', 'COMMUNICATION_SENT') | list | length }}</div>
+        <div class="stat-label">Communications Sent</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="alert-hard-constraint mb-4 d-flex align-items-start gap-3">
+  <i class="fas fa-lock mt-1"></i>
+  <div>
+    <strong>HC-07 Enforced — Immutable Override Audit Trail.</strong>
+    Every risk level change is permanently logged with officer identity, reason, original level,
+    new level, and timestamp. Entries cannot be edited or deleted.
+  </div>
+</div>
+
+<div class="card mb-4">
+  <div class="card-header d-flex align-items-center justify-content-between"
+       style="background:#fef2f2;border-bottom:1px solid #fecaca;color:#991b1b">
+    <span><i class="fas fa-user-shield me-2"></i>Risk Override Audit (HC-07)</span>
+    <span class="badge bg-danger">{{ overrides | length }} override{{ 's' if overrides | length != 1 else '' }}</span>
+  </div>
+  <div class="table-container">
+    <table class="hrt-table">
+      <thead>
+        <tr>
+          <th>#</th><th>Neighbourhood</th><th>Officer</th>
+          <th>Original Level</th><th>New Level</th><th>Reason</th><th>Date / Time</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for ov in overrides %}
+        <tr class="log-row row-override">
+          <td style="font-size:11px;color:#64748b">{{ ov.id }}</td>
+          <td>
+            <a href="{{ url_for('neighbourhood_detail', nb_id=ov.neighbourhood_id) }}"
+               style="font-weight:600;color:inherit;text-decoration:none">
+              {{ ov.neighbourhood_name }}
+            </a>
+          </td>
+          <td><span class="fw-700">{{ ov.full_name }}</span></td>
+          <td><span class="badge-risk badge-{{ ov.original_level }}">{{ ov.original_level }}</span></td>
+          <td><span class="badge-risk badge-{{ ov.new_level }}">{{ ov.new_level }}</span></td>
+          <td style="font-size:12px;max-width:280px">{{ ov.reason }}</td>
+          <td style="font-size:12px;white-space:nowrap;color:#64748b">{{ ov.overridden_at }}</td>
+        </tr>
+        {% else %}
+        <tr>
+          <td colspan="7" class="text-center py-4" style="color:#94a3b8">
+            <i class="fas fa-check-circle me-2 text-success"></i>
+            No overrides recorded. All classifications are at algorithm-computed values.
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-header d-flex justify-content-between align-items-center">
+    <span>
+      <i class="fas fa-list me-2 text-primary"></i>Full System Audit Log
+      <span class="badge bg-secondary ms-2">{{ logs | length }} entries</span>
+    </span>
+    <a href="{{ url_for('export_report', report_type='audit') }}" class="btn btn-sm btn-outline-secondary">
+      <i class="fas fa-download me-1"></i>Export CSV
+    </a>
+  </div>
+  <div class="table-container">
+    <table class="hrt-table">
+      <thead>
+        <tr>
+          <th>#</th><th>User</th><th>Action</th><th>Entity Type</th>
+          <th>Entity ID</th><th>Detail</th><th>IP Address</th><th>Timestamp</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for log in logs %}
+        <tr class="log-row {{ row_class(log.action) }}">
+          <td style="font-size:11px;color:#64748b">{{ log.id }}</td>
+          <td><span class="fw-700">{{ log.username or '—' }}</span></td>
+          <td>
+            <span class="action-badge {{ action_class(log.action) }}">{{ log.action or '—' }}</span>
+          </td>
+          <td style="font-size:12px;color:#64748b">{{ log.entity_type or '—' }}</td>
+          <td style="font-size:12px"><code>{{ log.entity_id or '—' }}</code></td>
+          <td style="font-size:12px;max-width:300px">{{ log.detail or '—' }}</td>
+          <td style="font-size:11px;color:#94a3b8">{{ log.ip_address or '127.0.0.1' }}</td>
+          <td style="font-size:12px;white-space:nowrap;color:#64748b">{{ log.logged_at }}</td>
+        </tr>
+        {% else %}
+        <tr>
+          <td colspan="8" class="text-center py-4" style="color:#94a3b8">
+            <i class="fas fa-info-circle me-2"></i>No audit entries yet.
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}
