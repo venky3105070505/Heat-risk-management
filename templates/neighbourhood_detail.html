@@ -1,312 +1,581 @@
 {% extends "base.html" %}
-{% block title %}{{ nb.neighbourhood_name }}{% endblock %}
+{% block title %}{{ nb.neighbourhood_name }} – Health Dossier{% endblock %}
 {% block page_title %}
   <i class="fas fa-map-marker-alt me-2 text-primary"></i>{{ nb.neighbourhood_name }}
-  <span class="badge-risk badge-{{ nb.risk_level }} ms-2">{{ nb.risk_level }}</span>
+  <span class="badge-risk badge-{{ nb.risk_level }} ms-2">{{ nb.risk_level }} Risk</span>
+  {% if nb.data_quality_flag and nb.data_quality_flag != 'OK' %}
+    <span class="badge bg-warning text-dark ms-1" style="font-size:11px"><i class="fas fa-exclamation-triangle"></i> {{ nb.data_quality_flag }}</span>
+  {% endif %}
 {% endblock %}
 {% block breadcrumb %}
   <a href="{{ url_for('neighbourhoods') }}" style="color:inherit;text-decoration:none">Neighbourhoods</a>
-  &rsaquo; {{ nb.neighbourhood_name }}
+  &rsaquo; {{ nb.neighbourhood_name }} ({{ nb.neighbourhood_id }})
 {% endblock %}
 
 {% block content %}
-<!-- ── Hard constraint alerts ─────────────────────────────────────────────── -->
+<!-- ── Alert Banner for Hard Constraints ───────────────────────────────────── -->
 {% if constraint_result.messages %}
-  <div class="{% if constraint_result.status == 'AMBIGUOUS' %}alert-ambiguous{% else %}alert-hard-constraint{% endif %} mb-3">
-    <strong><i class="fas fa-shield-alt me-2"></i>Hard Constraint Triggered: {{ constraint_result.status }}</strong>
-    <ul class="mb-0 mt-2">
-      {% for msg in constraint_result.messages %}<li>{{ msg }}</li>{% endfor %}
+  <div class="{% if constraint_result.status == 'AMBIGUOUS' %}alert-ambiguous{% else %}alert-hard-constraint{% endif %} mb-4 shadow-sm">
+    <div class="d-flex align-items-center gap-2">
+      <i class="fas fa-shield-alt fa-lg"></i>
+      <strong class="font-size-14">Decision Rule Triggered: {{ constraint_result.status }}</strong>
+    </div>
+    <ul class="mb-0 mt-2 ps-3">
+      {% for msg in constraint_result.messages %}<li class="small">{{ msg }}</li>{% endfor %}
     </ul>
   </div>
 {% endif %}
 
-<div class="row g-3">
-  <!-- Left column -->
-  <div class="col-lg-5">
-    <!-- Risk score card -->
-    <div class="card mb-3">
-      <div class="card-header"><i class="fas fa-calculator me-2 text-primary"></i>Risk Score & Classification</div>
-      <div class="card-body text-center">
-        {% if nb.risk_score %}
-          <div style="font-size:64px;font-weight:800;color:{{ 'var(--high)' if nb.risk_level=='High' else ('var(--medium)' if nb.risk_level=='Medium' else 'var(--low)') }};line-height:1">
-            {{ nb.risk_score }}
-          </div>
-          <div class="badge-risk badge-{{ nb.risk_level }} mt-1" style="font-size:13px;padding:6px 16px">
-            {{ nb.risk_level }} Risk
-          </div>
-          <div style="background:#f8fafc;border-radius:10px;padding:14px;margin-top:16px;text-align:left;font-size:12.5px">
-            <div class="fw-700 mb-2">Score Formula</div>
-            <code style="font-size:11.5px;color:#1e293b">
-              = (Climate×0.35) + (Vulnerability×0.30)<br>
-              &nbsp;&nbsp;+ (Built Env.×0.20) + (Service Risk×0.15)
-            </code>
-          </div>
-        {% else %}
-          <div class="text-muted py-3">
-            <i class="fas fa-ban fa-2x mb-2"></i><br>
-            Risk score unavailable<br>
-            <small>{{ constraint_result.status }}</small>
-          </div>
-        {% endif %}
-      </div>
+<!-- ── SECTION 1: RISK SUMMARY ─────────────────────────────────────────────── -->
+<div class="card mb-4 border-0 shadow-sm">
+  <div class="card-header bg-white border-bottom py-3 d-flex justify-content-between align-items-center">
+    <div>
+      <h6 class="fw-800 mb-0 text-slate-800"><i class="fas fa-tachometer-alt me-2 text-primary"></i>1. Heat Risk Summary & Key Indicators</h6>
+      <small class="text-muted">Primary composite indicators and thermal stress classification</small>
     </div>
-
-    <!-- Contribution breakdown -->
-    {% if assessment %}
-    <div class="card mb-3">
-      <div class="card-header"><i class="fas fa-layer-group me-2 text-primary"></i>Score Contribution Breakdown</div>
-      <div class="card-body">
-        {% set contribs = [
-          ('Climate / Heat Index', assessment.climate_contribution, '#ef4444'),
-          ('Vulnerability Score', assessment.vuln_contribution, '#f97316'),
-          ('Built Environment', assessment.built_contribution, '#3b82f6'),
-          ('Service Access Risk', assessment.service_contribution, '#22c55e'),
-        ] %}
-        {% for label, val, color in contribs %}
-        <div class="contrib-row">
-          <div class="contrib-label">{{ label }}</div>
-          <div class="contrib-bar-wrap">
-            <div class="contrib-bar-fill" style="width:{{ (val or 0) / 40 * 100 }}%;background:{{ color }}"></div>
-          </div>
-          <div class="contrib-pct" style="color:{{ color }}">{{ val or 0 }}</div>
-        </div>
-        {% endfor %}
-        <div class="mt-3">
-          <canvas id="contribChart" height="160"></canvas>
-        </div>
-        <p class="text-muted small mt-2 mb-0">
-          <i class="fas fa-info-circle me-1"></i>
-          Each component shows its additive contribution to the total risk score (max 100).
-          Climate (35%) + Vulnerability (30%) + Built Env. (20%) + Service Risk (15%) = 100%.
-        </p>
-      </div>
+    <div class="d-flex gap-2">
+      {% if session.role in ('Health Officer', 'Administrator') %}
+        <button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#snapshotModal">
+          <i class="fas fa-camera me-1"></i>Record Snapshot
+        </button>
+      {% endif %}
+      <a href="{{ url_for('map_view') }}" class="btn btn-sm btn-outline-secondary">
+        <i class="fas fa-map me-1"></i>Locate on Map
+      </a>
     </div>
-    {% endif %}
-
-    <!-- Escalation State Badge -->
-    <div class="card mb-3" style="border-left:4px solid {{ 'var(--high)' if escalation_state.colour=='high' else ('var(--medium)' if escalation_state.colour=='medium' else ('#a855f7' if escalation_state.colour=='ambig' else 'var(--low)')) }}">
-      <div class="card-body py-2">
-        <div class="d-flex align-items-center gap-3">
-          <i class="fas {{ escalation_state.icon }} fa-lg" style="color:{{ 'var(--high)' if escalation_state.colour=='high' else ('var(--medium)' if escalation_state.colour=='medium' else ('#a855f7' if escalation_state.colour=='ambig' else 'var(--low)')) }}"></i>
-          <div>
-            <div class="fw-700" style="font-size:13px">System State: {{ escalation_state.label }}</div>
-            <div class="text-muted" style="font-size:12px">{{ escalation_state.state }} — Based on current risk score and level</div>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Explain Risk Score (expandable) -->
-    {% if computed and computed.can_auto_classify %}
-    <div class="card mb-3">
-      <div class="card-header" style="cursor:pointer" data-bs-toggle="collapse" data-bs-target="#explainCollapse">
-        <i class="fas fa-microscope me-2 text-primary"></i>Explain Risk Score
-        <i class="fas fa-chevron-down float-end mt-1"></i>
-      </div>
-      <div id="explainCollapse" class="collapse show">
-        <div class="card-body" style="font-size:13px">
-          {% set fs = computed.formula_steps %}
-          <div class="fw-700 mb-2">Step-by-step calculation:</div>
-          <table class="table table-sm" style="font-size:12.5px">
-            <thead style="background:#f8fafc">
-              <tr><th>Factor</th><th>Raw Value</th><th>Normalised</th><th>Weight</th><th>Points Added</th></tr>
-            </thead>
-            <tbody>
-              <tr>
-                <td><strong>Climate / Heat</strong></td>
-                <td>{{ fs.climate_raw }}°C</td>
-                <td>{{ fs.climate_norm }}</td>
-                <td>35%</td>
-                <td class="fw-700" style="color:#ef4444">{{ computed.climate_contribution }}</td>
-              </tr>
-              <tr>
-                <td><strong>Vulnerability</strong></td>
-                <td>{{ fs.vuln_raw }}</td>
-                <td>{{ fs.vuln_norm }}</td>
-                <td>30%</td>
-                <td class="fw-700" style="color:#f97316">{{ computed.vuln_contribution }}</td>
-              </tr>
-              <tr>
-                <td><strong>Built Environment</strong></td>
-                <td>{{ fs.built_raw }}</td>
-                <td>{{ fs.built_norm }}</td>
-                <td>20%</td>
-                <td class="fw-700" style="color:#3b82f6">{{ computed.built_contribution }}</td>
-              </tr>
-              <tr>
-                <td><strong>Service Access Risk</strong></td>
-                <td>{{ fs.serv_raw }} (inv.)</td>
-                <td>{{ fs.serv_norm }}</td>
-                <td>15%</td>
-                <td class="fw-700" style="color:#22c55e">{{ computed.service_contribution }}</td>
-              </tr>
-              <tr style="border-top:2px solid #1e293b">
-                <td colspan="4" class="fw-700 text-end">Total Risk Score</td>
-                <td class="fw-700" style="font-size:15px">{{ computed.risk_score }}</td>
-              </tr>
-            </tbody>
-          </table>
-          <div class="alert alert-light py-2 mb-0" style="font-size:12px">
-            <i class="fas fa-info-circle me-1 text-primary"></i>
-            <strong>Formula:</strong> Score = (Climate×0.35 + Vulnerability×0.30 + Built×0.20 + ServiceRisk×0.15) × 100<br>
-            Service Risk = inverse of Service Access Score (low access = high risk).
-            <a href="/api/risk-explain/{{ nb.neighbourhood_id }}" target="_blank" class="ms-2">
-              <i class="fas fa-code me-1"></i>View JSON
-            </a>
-          </div>
-        </div>
-      </div>
-    </div>
-    {% endif %}
-
-    <!-- Override (Health Officer / Admin only) -->
-    {% if session.role in ('Health Officer', 'Administrator') %}
-    <div class="card mb-3" style="border:1px solid #fecaca">
-      <div class="card-header" style="background:#fef2f2;color:#991b1b">
-        <i class="fas fa-user-shield me-2"></i>Authorised Risk Override
-        <span class="badge bg-danger ms-2" style="font-size:10px">{{ session.role }} only</span>
-      </div>
-      <div class="card-body">
-        <p class="text-muted small">
-          Hard Constraint HC-05/HC-06/HC-07: Override requires reason and is permanently logged.
-        </p>
-        <form method="POST" action="{{ url_for('override_risk', nb_id=nb.neighbourhood_id) }}">
-          <div class="mb-2">
-            <label class="form-label">New Risk Level</label>
-            <select class="form-select" name="new_level" required>
-              <option value="Low"     {% if nb.risk_level=='Low' %}selected{% endif %}>Low</option>
-              <option value="Medium"  {% if nb.risk_level=='Medium' %}selected{% endif %}>Medium</option>
-              <option value="High"    {% if nb.risk_level=='High' %}selected{% endif %}>High</option>
-              <option value="AMBIGUOUS" {% if nb.risk_level=='AMBIGUOUS' %}selected{% endif %}>AMBIGUOUS</option>
-            </select>
-          </div>
-          <div class="mb-2">
-            <label class="form-label">Override Reason <span class="text-danger">*</span></label>
-            <textarea class="form-control" name="reason" rows="2"
-              placeholder="Required: describe why this override is necessary…" required></textarea>
-          </div>
-          <button type="submit" class="btn btn-danger btn-sm w-100">
-            <i class="fas fa-pen me-1"></i>Submit Override (Logged to Audit)
-          </button>
-        </form>
-        {% if overrides %}
-        <div class="mt-3">
-          <div class="fw-700 small mb-1">Override History</div>
-          {% for ov in overrides %}
-          <div class="small text-muted mb-1">
-            <i class="fas fa-history me-1"></i>
-            {{ ov.officer_name }} changed <strong>{{ ov.original_level }}</strong>
-            → <strong>{{ ov.new_level }}</strong>
-            on {{ ov.overridden_at[:10] }}:
-            <em>{{ ov.reason }}</em>
-          </div>
-          {% endfor %}
-        </div>
-        {% endif %}
-      </div>
-    </div>
-    {% endif %}
   </div>
+  <div class="card-body">
+    <div class="row g-3 align-items-center">
+      <!-- Big Score Box -->
+      <div class="col-lg-3 col-md-4 text-center border-end">
+        <div class="p-3">
+          {% if nb.risk_score is not none %}
+            <div style="font-size:60px;font-weight:900;line-height:1;color:{{ 'var(--high)' if nb.risk_level=='High' else ('var(--medium)' if nb.risk_level=='Medium' else 'var(--low)') }}">
+              {{ nb.risk_score }}
+            </div>
+            <div class="badge-risk badge-{{ nb.risk_level }} mt-2 px-3 py-1" style="font-size:13px">
+              {{ nb.risk_level }} Tier
+            </div>
+            <div class="text-muted small mt-2">Scale: 0 (Minimal) to 100 (Emergency)</div>
+          {% else %}
+            <div class="text-muted py-3">
+              <i class="fas fa-ban fa-3x mb-2 text-warning"></i>
+              <div class="fw-700">Score Not Automated</div>
+              <small class="text-muted">{{ constraint_result.status }}</small>
+            </div>
+          {% endif %}
+        </div>
+      </div>
 
-  <!-- Right column -->
-  <div class="col-lg-7">
-    <!-- Data fields -->
-    <div class="card mb-3">
-      <div class="card-header"><i class="fas fa-database me-2 text-primary"></i>Neighbourhood Data</div>
-      <div class="card-body">
+      <!-- Key Indicators Grid -->
+      <div class="col-lg-9 col-md-8">
         <div class="row g-2">
-          {% set fields = [
-            ('Temperature', (nb.temperature|string + '°C') if nb.temperature else 'MISSING ⚠', nb.temperature and nb.temperature > 38),
-            ('Heat Index', (nb.heat_index|string) if nb.heat_index else 'MISSING ⚠', false),
-            ('Humidity', (nb.humidity|string + '%') if nb.humidity else '—', false),
-            ('Population', nb.population, false),
-            ('Elderly %', (nb.elderly_percentage|string + '%') if nb.elderly_percentage else '—', nb.elderly_percentage and nb.elderly_percentage > 25),
-            ('Child %', (nb.child_percentage|string + '%') if nb.child_percentage else '—', false),
-            ('Low Income %', (nb.low_income_percentage|string + '%') if nb.low_income_percentage else '—', nb.low_income_percentage and nb.low_income_percentage > 40),
-            ('Pop. Density', nb.population_density, false),
-            ('Green Space %', (nb.green_space_percentage|string + '%') if nb.green_space_percentage else '—', nb.green_space_percentage and nb.green_space_percentage < 10),
-            ('Building Density', nb.building_density, false),
-            ('Healthcare Facilities', nb.healthcare_facilities, nb.healthcare_facilities == 0),
-            ('Nearest Hospital (km)', (nb.nearest_hospital_distance|string + ' km') if nb.nearest_hospital_distance else '—', nb.nearest_hospital_distance and nb.nearest_hospital_distance > 15),
-            ('Cooling Centres', nb.cooling_centres, nb.cooling_centres == 0),
-            ('Transport Access', (nb.public_transport_access|string + '/10') if nb.public_transport_access else '—', false),
-            ('Service Access Score', nb.service_access_score, nb.service_access_score and nb.service_access_score < 35),
-            ('Vulnerability Score', nb.vulnerability_score, nb.vulnerability_score and nb.vulnerability_score > 65),
-            ('Built Env. Score', nb.built_environment_score, nb.built_environment_score and nb.built_environment_score > 70),
-            ('Infectious Disease Cases', nb.infectious_disease_cases, false),
-            ('Previous Heat Incidents', nb.previous_heat_incidents, nb.previous_heat_incidents and nb.previous_heat_incidents > 10),
-            ('Comm. Reach %', (nb.communication_reach_percentage|string + '%') if nb.communication_reach_percentage else '—', false),
-          ] %}
-          {% for label, val, warn in fields %}
-          <div class="col-6">
-            <div style="background:#f8fafc;border-radius:8px;padding:10px 12px">
-              <div style="font-size:11px;color:#64748b;font-weight:600">{{ label }}</div>
-              <div style="font-weight:700;font-size:14px;color:{{ '#ef4444' if warn else '#1e293b' }}">
-                {{ val if val is not none and val != '' else '—' }}
-                {% if warn %}<i class="fas fa-exclamation-triangle text-danger ms-1" style="font-size:11px"></i>{% endif %}
+          <div class="col-sm-4 col-6">
+            <div class="p-2 rounded bg-light border">
+              <div class="text-muted small fw-600">Surface Temp</div>
+              <div class="h5 fw-800 mb-0 {{ 'text-danger' if nb.temperature and nb.temperature > 38 else '' }}">
+                {{ nb.temperature }}°C {% if not nb.temperature %}<span class="badge bg-warning text-dark">Missing</span>{% endif %}
               </div>
             </div>
           </div>
-          {% endfor %}
+          <div class="col-sm-4 col-6">
+            <div class="p-2 rounded bg-light border">
+              <div class="text-muted small fw-600">Apparent Heat Index</div>
+              <div class="h5 fw-800 mb-0">{{ nb.heat_index or '—' }}</div>
+            </div>
+          </div>
+          <div class="col-sm-4 col-6">
+            <div class="p-2 rounded bg-light border">
+              <div class="text-muted small fw-600">Relative Humidity</div>
+              <div class="h5 fw-800 mb-0">{{ nb.humidity }}%</div>
+            </div>
+          </div>
+          <div class="col-sm-4 col-6">
+            <div class="p-2 rounded bg-light border">
+              <div class="text-muted small fw-600">Social Vulnerability</div>
+              <div class="h5 fw-800 mb-0 {{ 'text-danger' if nb.vulnerability_score and nb.vulnerability_score > 60 else '' }}">
+                {{ nb.vulnerability_score }}/100
+              </div>
+            </div>
+          </div>
+          <div class="col-sm-4 col-6">
+            <div class="p-2 rounded bg-light border">
+              <div class="text-muted small fw-600">Built Environment Stress</div>
+              <div class="h5 fw-800 mb-0">{{ nb.built_environment_score }}/100</div>
+            </div>
+          </div>
+          <div class="col-sm-4 col-6">
+            <div class="p-2 rounded bg-light border">
+              <div class="text-muted small fw-600">Service Access Capacity</div>
+              <div class="h5 fw-800 mb-0 {{ 'text-danger' if nb.service_access_score and nb.service_access_score < 40 else 'text-success' }}">
+                {{ nb.service_access_score }}/100
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </div>
+  </div>
+</div>
 
-    <!-- Communication plan -->
-    <div class="card mb-3">
-      <div class="card-header"><i class="fas fa-bullhorn me-2 text-primary"></i>Recommended Communication Plan</div>
+<div class="row g-4 mb-4">
+  <!-- ── SECTION 2: RISK CONTRIBUTION BREAKDOWN ─────────────────────────────── -->
+  <div class="col-lg-6">
+    <div class="card h-100 border-0 shadow-sm">
+      <div class="card-header bg-white border-bottom py-3">
+        <h6 class="fw-800 mb-0 text-slate-800"><i class="fas fa-layer-group me-2 text-primary"></i>2. Risk Contribution Breakdown</h6>
+        <small class="text-muted">Additive weights: Climate (35%) + Vulnerability (30%) + Built (20%) + Service Risk (15%)</small>
+      </div>
       <div class="card-body">
-        <div class="d-flex align-items-center gap-2 mb-3">
-          <span class="badge badge-urgency-{{ comm_plan.urgency }}" style="font-size:12px;padding:5px 12px">
-            {{ comm_plan.urgency }}
-          </span>
-          <strong>{{ comm_plan.message_type }}</strong>
+        {% if assessment %}
+          {% set contribs = [
+            ('Climate & Heat Index (35% wt)', assessment.climate_contribution, '#ef4444', 35),
+            ('Social Vulnerability (30% wt)', assessment.vuln_contribution, '#f97316', 30),
+            ('Built Environment Stress (20% wt)', assessment.built_contribution, '#3b82f6', 20),
+            ('Service Access Deprivation (15% wt)', assessment.service_contribution, '#10b981', 15),
+          ] %}
+          <div class="d-flex flex-column gap-3 mb-3">
+            {% for label, val, color, max_wt in contribs %}
+            <div>
+              <div class="d-flex justify-content-between small fw-700 mb-1">
+                <span>{{ label }}</span>
+                <span style="color:{{ color }}">+{{ val or 0 }} pts</span>
+              </div>
+              <div class="progress" style="height:10px">
+                <div class="progress-bar" style="width:{{ (val or 0) / max_wt * 100 }}%;background:{{ color }}"
+                     role="progressbar" aria-valuenow="{{ val or 0 }}" aria-valuemin="0" aria-valuemax="{{ max_wt }}"></div>
+              </div>
+            </div>
+            {% endfor %}
+          </div>
+          <div style="height:180px">
+            <canvas id="contribChart"></canvas>
+          </div>
+        {% else %}
+          <div class="text-muted text-center py-4">No component breakdown recorded for this sector.</div>
+        {% endif %}
+
+        {% if computed and computed.can_auto_classify %}
+        <div class="mt-3 p-3 rounded bg-light border">
+          <div class="fw-700 small mb-1"><i class="fas fa-calculator me-1 text-primary"></i>Calculation Audit Step:</div>
+          <code style="font-size:11px;color:#1e293b;line-height:1.6">
+            Score = ({{ computed.formula_steps.climate_norm }} × 0.35 + {{ computed.formula_steps.vuln_norm }} × 0.30 + {{ computed.formula_steps.built_norm }} × 0.20 + {{ computed.formula_steps.serv_norm }} × 0.15) × 100 = <strong>{{ computed.risk_score }}</strong>
+          </code>
         </div>
-        <div style="background:#f8fafc;border-radius:8px;padding:12px 14px;font-size:13px;line-height:1.7;margin-bottom:12px">
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <!-- ── SECTION 3: POPULATION & VULNERABILITY ──────────────────────────────── -->
+  <div class="col-lg-6">
+    <div class="card h-100 border-0 shadow-sm">
+      <div class="card-header bg-white border-bottom py-3">
+        <h6 class="fw-800 mb-0 text-slate-800"><i class="fas fa-users me-2 text-warning"></i>3. Demographics & Community Vulnerability</h6>
+        <small class="text-muted">Populations susceptible to heat-induced morbidity</small>
+      </div>
+      <div class="card-body">
+        <div class="row g-3">
+          <div class="col-6">
+            <div class="p-3 rounded bg-light border text-center">
+              <div class="text-muted small fw-600">Total Population</div>
+              <div class="h4 fw-800 text-slate-800 mb-0">{{ '{:,}'.format(nb.population) if nb.population else '—' }}</div>
+              <small class="text-muted">{{ nb.population_density or '—' }} residents / km²</small>
+            </div>
+          </div>
+          <div class="col-6">
+            <div class="p-3 rounded bg-light border text-center">
+              <div class="text-muted small fw-600">Elderly Population (65+)</div>
+              <div class="h4 fw-800 {{ 'text-danger' if nb.elderly_percentage and nb.elderly_percentage > 25 else 'text-slate-800' }} mb-0">
+                {{ nb.elderly_percentage }}%
+              </div>
+              <small class="text-muted">Higher physiological risk</small>
+            </div>
+          </div>
+          <div class="col-6">
+            <div class="p-3 rounded bg-light border text-center">
+              <div class="text-muted small fw-600">Children (<15 yrs)</div>
+              <div class="h4 fw-800 text-slate-800 mb-0">{{ nb.child_percentage }}%</div>
+              <small class="text-muted">Dependent age cohort</small>
+            </div>
+          </div>
+          <div class="col-6">
+            <div class="p-3 rounded bg-light border text-center">
+              <div class="text-muted small fw-600">Low-Income Households</div>
+              <div class="h4 fw-800 {{ 'text-danger' if nb.low_income_percentage and nb.low_income_percentage > 40 else 'text-slate-800' }} mb-0">
+                {{ nb.low_income_percentage }}%
+              </div>
+              <small class="text-muted">Energy poverty factor</small>
+            </div>
+          </div>
+        </div>
+
+        <div class="mt-3 p-3 rounded bg-light border">
+          <div class="fw-700 small mb-2"><i class="fas fa-tree me-1 text-success"></i>Environmental Buffers:</div>
+          <div class="d-flex justify-content-between small mb-1">
+            <span>Urban Canopy & Green Space</span>
+            <span class="fw-700">{{ nb.green_space_percentage }}%</span>
+          </div>
+          <div class="progress mb-2" style="height:6px">
+            <div class="progress-bar bg-success" style="width:{{ nb.green_space_percentage }}%"></div>
+          </div>
+          <div class="d-flex justify-content-between small mb-1">
+            <span>Impervious Building Density</span>
+            <span class="fw-700">{{ (nb.building_density * 100)|round if nb.building_density else '—' }}%</span>
+          </div>
+          <div class="progress" style="height:6px">
+            <div class="progress-bar bg-secondary" style="width:{{ (nb.building_density * 100)|round if nb.building_density else 0 }}%"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="row g-4 mb-4">
+  <!-- ── SECTION 4: HEALTH & INFRASTRUCTURE ─────────────────────────────────── -->
+  <div class="col-lg-6">
+    <div class="card h-100 border-0 shadow-sm">
+      <div class="card-header bg-white border-bottom py-3">
+        <h6 class="fw-800 mb-0 text-slate-800"><i class="fas fa-hospital me-2 text-info"></i>4. Health Capacity & Physical Infrastructure</h6>
+        <small class="text-muted">Emergency cooling availability and healthcare network access</small>
+      </div>
+      <div class="card-body">
+        <div class="row g-2 mb-3">
+          <div class="col-6">
+            <div class="p-2 rounded bg-light border">
+              <span class="text-muted small">Cooling Centres</span>
+              <div class="h5 fw-800 mb-0 {{ 'text-danger' if nb.cooling_centres == 0 else 'text-success' }}">
+                <i class="fas fa-fan me-1"></i>{{ nb.cooling_centres }} facility{{ 's' if nb.cooling_centres != 1 else '' }}
+              </div>
+            </div>
+          </div>
+          <div class="col-6">
+            <div class="p-2 rounded bg-light border">
+              <span class="text-muted small">Healthcare Clinics</span>
+              <div class="h5 fw-800 mb-0">{{ nb.healthcare_facilities }} clinics</div>
+            </div>
+          </div>
+          <div class="col-6">
+            <div class="p-2 rounded bg-light border">
+              <span class="text-muted small">Nearest Hospital</span>
+              <div class="h5 fw-800 mb-0 {{ 'text-danger' if nb.nearest_hospital_distance and nb.nearest_hospital_distance > 15 else '' }}">
+                {{ nb.nearest_hospital_distance }} km
+              </div>
+            </div>
+          </div>
+          <div class="col-6">
+            <div class="p-2 rounded bg-light border">
+              <span class="text-muted small">Public Transport Access</span>
+              <div class="h5 fw-800 mb-0">{{ nb.public_transport_access }}/10 Index</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="p-3 rounded bg-light border">
+          <div class="fw-700 small mb-2"><i class="fas fa-notes-medical me-1 text-danger"></i>Morbidity Surveillance History:</div>
+          <div class="d-flex justify-content-between border-bottom py-1 small">
+            <span>Historical Heat Illness Incidents</span>
+            <span class="fw-700 text-danger">{{ nb.previous_heat_incidents or 0 }} recorded events</span>
+          </div>
+          <div class="d-flex justify-content-between py-1 small">
+            <span>Infectious Respiratory / Vector Cases</span>
+            <span class="fw-700">{{ nb.infectious_disease_cases or 0 }} cases</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── SECTION 5: COMMUNICATION READINESS ─────────────────────────────────── -->
+  <div class="col-lg-6">
+    <div class="card h-100 border-0 shadow-sm">
+      <div class="card-header bg-white border-bottom py-3 d-flex justify-content-between align-items-center">
+        <div>
+          <h6 class="fw-800 mb-0 text-slate-800"><i class="fas fa-bullhorn me-2 text-primary"></i>5. Communication Readiness & Channels</h6>
+          <small class="text-muted">Targeted messaging framework and delivery track record</small>
+        </div>
+        <a href="{{ url_for('communication') }}?nb={{ nb.neighbourhood_id }}" class="btn btn-sm btn-primary">
+          <i class="fas fa-paper-plane me-1"></i>Launch Comms
+        </a>
+      </div>
+      <div class="card-body">
+        <div class="d-flex align-items-center gap-2 mb-2">
+          <span class="badge badge-urgency-{{ comm_plan.urgency }} px-2 py-1">{{ comm_plan.urgency }} Urgency</span>
+          <span class="badge bg-secondary px-2 py-1">{{ comm_plan.priority }}</span>
+        </div>
+        <div class="p-2 rounded bg-light border mb-2 small text-muted">
+          <strong>Audience:</strong> {{ comm_plan.target_audience }}
+        </div>
+        <div class="p-3 rounded bg-light border mb-3 small" style="line-height:1.6">
+          <div class="fw-700 text-slate-800 mb-1">Standard Recommended Advisory:</div>
           {{ comm_plan.message }}
         </div>
-        <div class="fw-700 small mb-1">Recommended Channels</div>
+
+        <div class="fw-700 small mb-1">Deployment Channels:</div>
         <div class="d-flex flex-wrap gap-1 mb-3">
           {% for ch in comm_plan.channels %}
-            <span class="badge" style="background:#eff6ff;color:#1e40af;border:1px solid #bfdbfe;font-size:11.5px;padding:4px 10px">
-              {{ ch }}
+            <span class="badge bg-primary-subtle text-primary border border-primary-subtle px-2 py-1" style="font-size:11px">
+              <i class="fas fa-check-circle me-1"></i>{{ ch }}
             </span>
+          {% else %}
+            <span class="text-muted small">No automatic dissemination (Manual review required)</span>
           {% endfor %}
         </div>
-        <div class="fw-700 small mb-1">Required Actions</div>
-        <ul class="mb-0">
-          {% for a in comm_plan.actions %}
-            <li style="font-size:13px">{{ a }}</li>
-          {% endfor %}
-        </ul>
-        <div class="mt-3">
-          <a href="{{ url_for('communication') }}?nb={{ nb.neighbourhood_id }}"
-             class="btn btn-primary btn-sm">
-            <i class="fas fa-paper-plane me-1"></i>Send Communication
-          </a>
-        </div>
-      </div>
-    </div>
 
-    <!-- Reviews -->
-    {% if reviews %}
-    <div class="card mb-3">
-      <div class="card-header"><i class="fas fa-clipboard-check me-2 text-medium"></i>Human Review History</div>
-      <div class="card-body">
-        {% for r in reviews %}
-        <div class="mb-2 p-2" style="background:#fff7ed;border-radius:8px;border:1px solid #fed7aa">
-          <div class="d-flex justify-content-between">
-            <span class="fw-700 small">{{ r.reason[:80] }}</span>
-            <span class="badge badge-status-{{ r.status | replace(' ','-') }}" style="font-size:11px">
-              {{ r.status }}
+        <div class="fw-700 small mb-1">Recent Transmissions ({{ comms|length }}):</div>
+        <div style="max-height:130px;overflow-y:auto">
+          {% for c in comms[:4] %}
+          <div class="d-flex justify-content-between align-items-center border-bottom py-1 small">
+            <div>
+              <span class="badge bg-light text-dark border">{{ c.channel }}</span>
+              <span class="text-muted ms-1">{{ c.sent_at[:10] if c.sent_at else c.created_at[:10] }}</span>
+            </div>
+            <span class="badge bg-{{ 'success' if c.status=='Sent' else ('danger' if c.status=='Failed' else 'warning') }}">
+              {{ c.status }}
             </span>
           </div>
-          <div class="small text-muted">Assigned to: {{ r.officer_name or 'Unassigned' }} | {{ r.created_at[:10] }}</div>
+          {% else %}
+          <div class="text-muted small py-1">No prior communication records on file.</div>
+          {% endfor %}
         </div>
-        {% endfor %}
       </div>
     </div>
+  </div>
+</div>
+
+<div class="row g-4 mb-4">
+  <!-- ── SECTION 6: HUMAN DECISION & OVERRIDE SECTION ──────────────────────── -->
+  <div class="col-lg-6">
+    <div class="card h-100 border-0 shadow-sm">
+      <div class="card-header bg-white border-bottom py-3">
+        <h6 class="fw-800 mb-0 text-slate-800"><i class="fas fa-user-check me-2 text-warning"></i>6. Human Decision & Oversight Section</h6>
+        <small class="text-muted">Health Officer review queue status and authorized overrides</small>
+      </div>
+      <div class="card-body">
+        <!-- Review Queue Status -->
+        <div class="mb-3 p-3 rounded bg-light border">
+          <div class="d-flex justify-content-between align-items-center mb-2">
+            <span class="fw-700 small">Human Review Queue</span>
+            {% if reviews %}
+              {% set latest_rev = reviews[0] %}
+              <span class="badge badge-status-{{ latest_rev.status | replace(' ','-') }}">{{ latest_rev.status }}</span>
+            {% else %}
+              <span class="badge bg-secondary">No Review Open</span>
+            {% endif %}
+          </div>
+          {% if reviews %}
+            {% set latest_rev = reviews[0] %}
+            <p class="small text-muted mb-1"><strong>Reason:</strong> {{ latest_rev.reason }}</p>
+            <p class="small text-muted mb-0"><strong>Assigned:</strong> {{ latest_rev.officer_name or 'Unassigned' }} | {{ latest_rev.created_at[:10] }}</p>
+            {% if latest_rev.review_notes %}
+              <div class="mt-2 p-2 rounded bg-white border small text-dark">
+                <em>"{{ latest_rev.review_notes }}"</em>
+              </div>
+            {% endif %}
+          {% endif %}
+        </div>
+
+        <!-- Override History -->
+        <div class="fw-700 small mb-2"><i class="fas fa-history me-1 text-secondary"></i>Override History (HC-07):</div>
+        {% if overrides %}
+          <div style="max-height:140px;overflow-y:auto" class="mb-3">
+            {% for ov in overrides %}
+            <div class="p-2 mb-1 rounded bg-danger-subtle border border-danger-subtle small">
+              <div class="d-flex justify-content-between">
+                <strong>{{ ov.officer_name }}</strong>
+                <span class="text-muted">{{ ov.overridden_at[:10] }}</span>
+              </div>
+              <div>{{ ov.original_level }} &rarr; <span class="fw-700 text-danger">{{ ov.new_level }}</span></div>
+              <div class="text-muted fst-italic">"{{ ov.reason }}"</div>
+            </div>
+            {% endfor %}
+          </div>
+        {% else %}
+          <div class="text-muted small mb-3">No administrative risk overrides recorded.</div>
+        {% endif %}
+
+        <!-- Override Form (Authorized Roles Only) -->
+        {% if session.role in ('Health Officer', 'Administrator') %}
+        <div class="p-3 rounded border border-danger-subtle bg-danger-subtle">
+          <div class="d-flex justify-content-between align-items-center mb-2">
+            <span class="fw-700 small text-danger"><i class="fas fa-user-shield me-1"></i>Authorised Override (HC-05/06)</span>
+            <span class="badge bg-danger">{{ session.role }} Only</span>
+          </div>
+          <form method="POST" action="{{ url_for('override_risk', nb_id=nb.neighbourhood_id) }}" onsubmit="return confirm('WARNING: You are about to override an official public health risk classification. This action will be permanently recorded in the immutable audit log (HC-07). Proceed?');">
+            <div class="row g-2 mb-2">
+              <div class="col-6">
+                <label class="form-label small fw-700">New Risk Tier</label>
+                <select class="form-select form-select-sm" name="new_level" required>
+                  <option value="Low" {% if nb.risk_level=='Low' %}selected{% endif %}>Low</option>
+                  <option value="Medium" {% if nb.risk_level=='Medium' %}selected{% endif %}>Medium</option>
+                  <option value="High" {% if nb.risk_level=='High' %}selected{% endif %}>High</option>
+                  <option value="AMBIGUOUS" {% if nb.risk_level=='AMBIGUOUS' %}selected{% endif %}>AMBIGUOUS</option>
+                </select>
+              </div>
+              <div class="col-6">
+                <label class="form-label small fw-700">Current Officer</label>
+                <input type="text" class="form-control form-control-sm" value="{{ session.full_name }}" disabled>
+              </div>
+            </div>
+            <div class="mb-2">
+              <label class="form-label small fw-700">Required Justification <span class="text-danger">*</span></label>
+              <textarea class="form-control form-control-sm" name="reason" rows="2" placeholder="State operational or epidemiological reason for override..." required></textarea>
+            </div>
+            <button type="submit" class="btn btn-sm btn-danger w-100">
+              <i class="fas fa-gavel me-1"></i>Submit Authorized Override
+            </button>
+          </form>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <!-- ── SECTION 7: ESCALATION STATUS ───────────────────────────────────────── -->
+  <div class="col-lg-6">
+    <div class="card h-100 border-0 shadow-sm">
+      <div class="card-header bg-white border-bottom py-3">
+        <h6 class="fw-800 mb-0 text-slate-800"><i class="fas fa-radiation me-2 text-danger"></i>7. Escalation Status & Protocol Pipeline</h6>
+        <small class="text-muted">6-stage escalation lifecycle from active monitoring to emergency intervention</small>
+      </div>
+      <div class="card-body">
+        <!-- Current State Indicator -->
+        <div class="p-3 rounded border mb-3" style="border-left:5px solid {{ 'var(--high)' if escalation_state.colour=='high' else ('var(--medium)' if escalation_state.colour=='medium' else 'var(--low)') }} !important">
+          <div class="d-flex align-items-center gap-3">
+            <i class="fas {{ escalation_state.icon }} fa-2x" style="color:{{ 'var(--high)' if escalation_state.colour=='high' else ('var(--medium)' if escalation_state.colour=='medium' else 'var(--low)') }}"></i>
+            <div>
+              <div class="fw-800 text-slate-800 h6 mb-0">{{ escalation_state.label }}</div>
+              <small class="text-muted">Pipeline State: <code>{{ escalation_state.state }}</code></small>
+            </div>
+          </div>
+        </div>
+
+        <!-- 6-Stage Timeline -->
+        <div class="timeline-stepper mb-3 p-2 bg-light rounded border">
+          <div class="small fw-700 mb-2 text-muted">6-Stage Response Pipeline:</div>
+          {% set stages = [
+            ('NORMAL', 'Normal Low Risk'),
+            ('MONITORING', 'Monitoring'),
+            ('TARGETED', 'Targeted Response'),
+            ('HIGH_REVIEW', 'Human Officer Review'),
+            ('HIGH_ESCALATION', 'High Risk Escalation'),
+            ('IMMEDIATE', 'Immediate Escalation')
+          ] %}
+          <div class="d-flex flex-column gap-1">
+            {% for st_id, st_lbl in stages %}
+            <div class="d-flex align-items-center gap-2 small py-1 px-2 rounded {{ 'bg-primary-subtle text-primary fw-700' if escalation_state.state == st_id else 'text-muted' }}">
+              <i class="fas {{ 'fa-check-circle text-primary' if escalation_state.state == st_id else 'fa-circle' }}" style="font-size:10px"></i>
+              <span>{{ st_lbl }}</span>
+              {% if escalation_state.state == st_id %}
+                <span class="badge bg-primary ms-auto" style="font-size:9px">Active State</span>
+              {% endif %}
+            </div>
+            {% endfor %}
+          </div>
+        </div>
+
+        <!-- Open Escalation Record -->
+        {% if escalation_row %}
+          <div class="p-3 rounded bg-danger-subtle border border-danger-subtle">
+            <div class="d-flex justify-content-between align-items-center mb-1">
+              <strong class="text-danger small"><i class="fas fa-exclamation-circle me-1"></i>Active Escalation File #{{ escalation_row.id }}</strong>
+              <span class="badge bg-danger">{{ escalation_row.status }}</span>
+            </div>
+            <p class="small text-muted mb-1"><strong>Reason:</strong> {{ escalation_row.reason }}</p>
+            <p class="small text-muted mb-0"><strong>Assigned Officer:</strong> {{ escalation_row.assigned_to_name or 'Unassigned' }}</p>
+          </div>
+        {% else %}
+          <div class="text-muted small p-3 rounded bg-light border text-center">
+            <i class="fas fa-check-circle text-success me-1"></i>No unresolved escalation tickets for this neighbourhood.
+          </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── HISTORICAL SURVEILLANCE SNAPSHOTS ──────────────────────────────────── -->
+<div class="card mb-4 border-0 shadow-sm">
+  <div class="card-header bg-white border-bottom py-3 d-flex justify-content-between align-items-center">
+    <div>
+      <h6 class="fw-800 mb-0 text-slate-800"><i class="fas fa-history me-2 text-primary"></i>Historical Surveillance Snapshots (Trend Analysis)</h6>
+      <small class="text-muted">Archived public-health surveillance observations</small>
+    </div>
+    {% if session.role in ('Health Officer', 'Administrator') %}
+      <button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#snapshotModal">
+        <i class="fas fa-plus me-1"></i>Take Observation Snapshot
+      </button>
     {% endif %}
+  </div>
+  <div class="card-body">
+    {% if snapshots %}
+      <div class="table-container">
+        <table class="hrt-table">
+          <thead>
+            <tr>
+              <th>Snapshot Date</th>
+              <th>Risk Score</th>
+              <th>Risk Level</th>
+              <th>Temperature</th>
+              <th>Heat Index</th>
+              <th>Vulnerability</th>
+              <th>Observer</th>
+              <th>Field Notes</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for s in snapshots %}
+            <tr>
+              <td><code>{{ s.recorded_at }}</code></td>
+              <td><strong>{{ s.risk_score or 'N/A' }}</strong></td>
+              <td><span class="badge-risk badge-{{ s.risk_level }}">{{ s.risk_level }}</span></td>
+              <td>{{ s.temperature }}°C</td>
+              <td>{{ s.heat_index or '—' }}</td>
+              <td>{{ s.vulnerability_score or '—' }}</td>
+              <td>{{ s.recorder_name or 'System' }}</td>
+              <td class="text-muted small">{{ s.notes or '—' }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <div class="text-center py-4 text-muted">
+        <i class="fas fa-clock fa-2x mb-2 d-block text-secondary"></i>
+        <strong>No historical observations available yet.</strong>
+        <p class="small text-muted mt-1 mb-0">Historical snapshots will accumulate as surveillance officers capture environmental readings over time.</p>
+      </div>
+    {% endif %}
+  </div>
+</div>
+
+<!-- Modal: Record Snapshot -->
+<div class="modal fade" id="snapshotModal" tabindex="-1" aria-labelledby="snapshotModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form method="POST" action="{{ url_for('record_snapshot', nb_id=nb.neighbourhood_id) }}">
+        <div class="modal-header">
+          <h5 class="modal-title fw-700" id="snapshotModalLabel">
+            <i class="fas fa-camera text-primary me-2"></i>Record Surveillance Snapshot
+          </h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <p class="small text-muted">
+            This will archive the current temperature ({{ nb.temperature }}°C), vulnerability ({{ nb.vulnerability_score }}), and risk score ({{ nb.risk_score }}) into the permanent observation trend log for {{ nb.neighbourhood_name }}.
+          </p>
+          <div class="mb-3">
+            <label class="form-label small fw-700">Observation Notes / Context</label>
+            <textarea class="form-control" name="notes" rows="3" placeholder="E.g., Heatwave day 2, localized cooling shelter dispatch verified..."></textarea>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-primary btn-sm">Save Snapshot</button>
+        </div>
+      </form>
+    </div>
   </div>
 </div>
 {% endblock %}
@@ -315,7 +584,9 @@
 <script>
 const contributionData = {{ contributions | safe }};
 document.addEventListener('DOMContentLoaded', () => {
-  initContribBar('contribChart', contributionData);
+  if (contributionData) {
+    initContribBar('contribChart', contributionData);
+  }
 });
 </script>
 {% endblock %}

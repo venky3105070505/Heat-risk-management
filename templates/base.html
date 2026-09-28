@@ -1,10 +1,13 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="light">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>{% block title %}Heat-Risk Planner{% endblock %} – City Health Department</title>
-  <meta name="description" content="{% block description %}Neighbourhood Heat-Risk Communication & Response Planner{% endblock %}">
+  <title>{% block title %}Decision Support Dashboard{% endblock %} – City Health Department</title>
+  <meta name="description" content="{% block description %}Neighbourhood Heat-Risk Communication & Response Decision Support Dashboard — City Health Department{% endblock %}">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
   <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" rel="stylesheet">
   <link href="{{ url_for('static', filename='css/style.css') }}" rel="stylesheet">
@@ -12,75 +15,110 @@
 </head>
 <body>
 
+<!-- Mobile Sidebar Backdrop -->
+<div class="sidebar-backdrop" id="sidebarBackdrop" onclick="toggleSidebar()"></div>
+
 <!-- ── Sidebar ──────────────────────────────────────────────────────────────── -->
 <nav class="sidebar" id="sidebar">
   <div class="sidebar-brand">
-    <div class="brand-icon"><i class="fas fa-heartbeat" style="color:#fff"></i></div>
-    <h6>Heat-Risk Planner</h6>
-    <small>City Health Department</small>
+    <div class="d-flex align-items-center justify-content-between">
+      <div class="d-flex align-items-center gap-2">
+        <div class="brand-icon"><i class="fas fa-heartbeat" style="color:#fff"></i></div>
+        <div>
+          <h6>Heat-Risk Planner</h6>
+          <small>City Health Department</small>
+        </div>
+      </div>
+      <button class="btn btn-sm text-light d-md-none p-1" onclick="toggleSidebar()" aria-label="Close Navigation">
+        <i class="fas fa-times"></i>
+      </button>
+    </div>
   </div>
 
-  <div class="sidebar-section">Main</div>
-  <a href="{{ url_for('dashboard') }}" class="sidebar-link {% if request.endpoint=='dashboard' %}active{% endif %}">
-    <i class="fas fa-tachometer-alt"></i> Dashboard
-  </a>
-  <a href="{{ url_for('neighbourhoods') }}" class="sidebar-link {% if request.endpoint in ('neighbourhoods','neighbourhood_detail') %}active{% endif %}">
-    <i class="fas fa-map-marker-alt"></i> Neighbourhoods
-  </a>
-  <a href="{{ url_for('map_view') }}" class="sidebar-link {% if request.endpoint=='map_view' %}active{% endif %}">
-    <i class="fas fa-globe"></i> Risk Map
-  </a>
+  <div class="sidebar-menu">
+    <div class="sidebar-section">Main Surveillance</div>
+    <a href="{{ url_for('dashboard') }}" class="sidebar-link {% if request.endpoint=='dashboard' %}active{% endif %}">
+      <i class="fas fa-tachometer-alt"></i> Dashboard
+    </a>
+    <a href="{{ url_for('neighbourhoods') }}" class="sidebar-link {% if request.endpoint in ('neighbourhoods','neighbourhood_detail') %}active{% endif %}">
+      <i class="fas fa-map-marker-alt"></i> Neighbourhoods
+    </a>
+    <a href="{{ url_for('map_view') }}" class="sidebar-link {% if request.endpoint=='map_view' %}active{% endif %}">
+      <i class="fas fa-globe"></i> Interactive Risk Map
+    </a>
 
-  <div class="sidebar-section">Operations</div>
-  <a href="{{ url_for('communication') }}" class="sidebar-link {% if request.endpoint=='communication' %}active{% endif %}">
-    <i class="fas fa-bullhorn"></i> Communications
-  </a>
-  <a href="{{ url_for('review_queue') }}" class="sidebar-link {% if request.endpoint=='review_queue' %}active{% endif %}">
-    <i class="fas fa-clipboard-check"></i> Review Queue
-  </a>
-  <a href="{{ url_for('escalation') }}" class="sidebar-link {% if request.endpoint=='escalation' %}active{% endif %}">
-    <i class="fas fa-exclamation-triangle"></i> Escalation
-  </a>
+    <div class="sidebar-section">Operations & Response</div>
+    <a href="{{ url_for('communication') }}" class="sidebar-link {% if request.endpoint=='communication' %}active{% endif %}">
+      <i class="fas fa-bullhorn"></i> Communications
+    </a>
+    <a href="{{ url_for('review_queue') }}" class="sidebar-link {% if request.endpoint=='review_queue' %}active{% endif %}">
+      <i class="fas fa-clipboard-check"></i> Review Queue
+      {% if system_alerts and system_alerts.pending_reviews_count %}
+        <span class="badge bg-warning text-dark ms-auto" style="font-size:10px">{{ system_alerts.pending_reviews_count }}</span>
+      {% endif %}
+    </a>
+    <a href="{{ url_for('escalation') }}" class="sidebar-link {% if request.endpoint=='escalation' %}active{% endif %}">
+      <i class="fas fa-exclamation-triangle"></i> Escalations
+      {% if system_alerts and system_alerts.open_escalations_count %}
+        <span class="badge bg-danger ms-auto" style="font-size:10px">{{ system_alerts.open_escalations_count }}</span>
+      {% endif %}
+    </a>
 
-  <div class="sidebar-section">Analysis</div>
-  <a href="{{ url_for('strategy') }}" class="sidebar-link {% if request.endpoint=='strategy' %}active{% endif %}">
-    <i class="fas fa-balance-scale"></i> Strategy Comparison
-  </a>
-  <a href="{{ url_for('journeys') }}" class="sidebar-link {% if request.endpoint=='journeys' %}active{% endif %}">
-    <i class="fas fa-route"></i> Case Journeys
-  </a>
-  <a href="{{ url_for('experiment') }}" class="sidebar-link {% if request.endpoint=='experiment' %}active{% endif %}">
-    <i class="fas fa-flask"></i> Experiment Results
-  </a>
+    <div class="sidebar-section">Analytics & Strategy</div>
+    <a href="{{ url_for('analytics') }}" class="sidebar-link {% if request.endpoint=='analytics' %}active{% endif %}">
+      <i class="fas fa-chart-line"></i> Analytics & Insights
+    </a>
+    <a href="{{ url_for('strategy') }}" class="sidebar-link {% if request.endpoint=='strategy' %}active{% endif %}">
+      <i class="fas fa-balance-scale"></i> Strategy Comparison
+    </a>
+    <a href="{{ url_for('journeys') }}" class="sidebar-link {% if request.endpoint=='journeys' %}active{% endif %}">
+      <i class="fas fa-route"></i> Case Journeys
+    </a>
+    <a href="{{ url_for('experiment') }}" class="sidebar-link {% if request.endpoint=='experiment' %}active{% endif %}">
+      <i class="fas fa-flask"></i> Experiment Results
+    </a>
 
-  <div class="sidebar-section">Governance</div>
-  <a href="{{ url_for('failures') }}" class="sidebar-link {% if request.endpoint=='failures' %}active{% endif %}">
-    <i class="fas fa-bug"></i> Failure Analysis
-  </a>
-  <a href="{{ url_for('constraints') }}" class="sidebar-link {% if request.endpoint=='constraints' %}active{% endif %}">
-    <i class="fas fa-sliders-h"></i> Constraints
-  </a>
-  <a href="{{ url_for('data_quality') }}" class="sidebar-link {% if request.endpoint=='data_quality' %}active{% endif %}">
-    <i class="fas fa-clipboard-list"></i> Data Quality
-  </a>
-  <a href="{{ url_for('audit') }}" class="sidebar-link {% if request.endpoint=='audit' %}active{% endif %}">
-    <i class="fas fa-history"></i> Audit Log
-  </a>
-  <a href="{{ url_for('feedback') }}" class="sidebar-link {% if request.endpoint=='feedback' %}active{% endif %}">
-    <i class="fas fa-comments"></i> Stakeholder Feedback
-  </a>
-  <a href="{{ url_for('documentation') }}" class="sidebar-link {% if request.endpoint=='documentation' %}active{% endif %}">
-    <i class="fas fa-book"></i> Documentation
-  </a>
+    <div class="sidebar-section">Governance & Audit</div>
+    {% if session.role == 'Administrator' %}
+    <a href="{{ url_for('users_management') }}" class="sidebar-link {% if request.endpoint=='users_management' %}active{% endif %}" style="color:#60a5fa">
+      <i class="fas fa-users-cog"></i> User Management
+    </a>
+    {% endif %}
+    <a href="{{ url_for('data_quality') }}" class="sidebar-link {% if request.endpoint=='data_quality' %}active{% endif %}">
+      <i class="fas fa-clipboard-list"></i> Data Quality Center
+      {% if system_alerts and system_alerts.data_issues_count %}
+        <span class="badge bg-warning text-dark ms-auto" style="font-size:10px">{{ system_alerts.data_issues_count }}</span>
+      {% endif %}
+    </a>
+    <a href="{{ url_for('failures') }}" class="sidebar-link {% if request.endpoint=='failures' %}active{% endif %}">
+      <i class="fas fa-bug"></i> Failure Analysis
+    </a>
+    <a href="{{ url_for('constraints') }}" class="sidebar-link {% if request.endpoint=='constraints' %}active{% endif %}">
+      <i class="fas fa-sliders-h"></i> Constraints
+    </a>
+    <a href="{{ url_for('audit') }}" class="sidebar-link {% if request.endpoint=='audit' %}active{% endif %}">
+      <i class="fas fa-history"></i> Audit Log
+    </a>
+    <a href="{{ url_for('feedback') }}" class="sidebar-link {% if request.endpoint=='feedback' %}active{% endif %}">
+      <i class="fas fa-comments"></i> Stakeholder Feedback
+    </a>
+    <a href="{{ url_for('documentation') }}" class="sidebar-link {% if request.endpoint=='documentation' %}active{% endif %}">
+      <i class="fas fa-book"></i> Documentation
+    </a>
+  </div>
 
   <div class="sidebar-footer">
-    <div style="font-size:12px;color:#64748b;margin-bottom:8px">
-      <i class="fas fa-user-circle me-1"></i>
-      <strong style="color:#94a3b8">{{ session.full_name }}</strong><br>
-      <span style="font-size:11px">{{ session.role }}</span>
+    <div class="d-flex align-items-center gap-2 mb-2">
+      <i class="fas fa-user-circle fa-2x text-slate-400"></i>
+      <div style="font-size:12px;line-height:1.2;overflow:hidden">
+        <strong class="d-block text-truncate" style="color:#f1f5f9;max-width:160px">{{ session.full_name or session.username }}</strong>
+        <span class="badge mt-1" style="font-size:9px;background:{{ '#ef4444' if session.role=='Administrator' else ('#1a56db' if session.role=='Health Officer' else '#22c55e') }}">
+          {{ session.role }}
+        </span>
+      </div>
     </div>
-    <a href="{{ url_for('logout') }}" class="sidebar-link" style="margin:0;padding:7px 10px">
-      <i class="fas fa-sign-out-alt"></i> Logout
+    <a href="{{ url_for('logout') }}" class="sidebar-link text-danger-emphasis py-1 px-2 m-0" style="font-size:12px">
+      <i class="fas fa-sign-out-alt"></i> Sign out
     </a>
   </div>
 </nav>
@@ -89,30 +127,106 @@
 <div class="main-content">
   <!-- Topbar -->
   <header class="topbar">
-    <div>
-      <div class="topbar-title">{% block page_title %}{% endblock %}</div>
-      <div class="topbar-breadcrumb">{% block breadcrumb %}{% endblock %}</div>
+    <div class="d-flex align-items-center gap-2">
+      <!-- Mobile hamburger -->
+      <button class="btn btn-sm btn-outline-secondary d-md-none" id="mobileMenuBtn" onclick="toggleSidebar()" aria-label="Toggle Navigation">
+        <i class="fas fa-bars"></i>
+      </button>
+      <div>
+        <h1 class="topbar-title h5 mb-0">{% block page_title %}{% endblock %}</h1>
+        <div class="topbar-breadcrumb">{% block breadcrumb %}{% endblock %}</div>
+      </div>
     </div>
-    <div class="topbar-right">
-      {% with messages = get_flashed_messages(with_categories=true) %}
-        {% for cat, msg in messages %}
-          <div class="alert alert-{{ cat }} py-1 px-3 mb-0" role="alert" style="font-size:13px">
-            {{ msg }}
-          </div>
-        {% endfor %}
-      {% endwith %}
 
-      <!-- Authenticated user info -->
-      <div class="d-flex align-items-center gap-2">
-        <div style="text-align:right;line-height:1.3">
-          <div style="font-size:13px;font-weight:700;color:#1e293b">
-            {{ session.full_name or session.email or session.username }}
-          </div>
-          <div style="font-size:11px;color:#64748b">{{ session.role }}</div>
+    <!-- Center/Right Search Bar & Utilities -->
+    <div class="topbar-right d-flex align-items-center gap-2">
+      <!-- Global Search -->
+      <div class="global-search-wrap position-relative">
+        <div class="input-group input-group-sm">
+          <span class="input-group-text bg-transparent border-end-0"><i class="fas fa-search text-muted"></i></span>
+          <input type="text" id="globalSearchInput" class="form-control border-start-0"
+                 placeholder="Search neighbourhood, ID, risk..." autocomplete="off">
         </div>
-        <span class="badge" style="background:{{ '#ef4444' if session.role=='Administrator' else ('#1a56db' if session.role=='Health Officer' else '#22c55e') }}">
-          {{ session.role }}
-        </span>
+        <div id="globalSearchResults" class="search-dropdown-menu shadow"></div>
+      </div>
+
+      <!-- Dark Mode Toggle Button -->
+      <button id="themeToggleBtn" class="btn btn-sm btn-outline-secondary" onclick="toggleDarkMode()" title="Toggle Light/Dark Theme">
+        <i class="fas fa-moon" id="themeIcon"></i>
+      </button>
+
+      <!-- Notification Center Dropdown -->
+      <div class="dropdown">
+        <button class="btn btn-sm btn-outline-secondary position-relative" id="notificationsDropdown" data-bs-toggle="dropdown" aria-expanded="false" title="System Notifications">
+          <i class="fas fa-bell"></i>
+          {% if alerts_unread_count and alerts_unread_count > 0 %}
+            <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger" style="font-size:9px">
+              {{ alerts_unread_count }}
+            </span>
+          {% endif %}
+        </button>
+        <div class="dropdown-menu dropdown-menu-end shadow p-0 notification-dropdown" aria-labelledby="notificationsDropdown">
+          <div class="notification-header d-flex justify-content-between align-items-center p-3 border-bottom">
+            <h6 class="mb-0 fw-700 font-size-13"><i class="fas fa-bell me-2 text-primary"></i>Operational Alerts</h6>
+            <span class="badge bg-danger">{{ alerts_unread_count or 0 }} Active</span>
+          </div>
+          <div class="notification-list p-2" style="max-height:340px;overflow-y:auto">
+            {% if system_alerts and alerts_unread_count > 0 %}
+              {% if system_alerts.critical_count > 0 %}
+                <div class="notification-item p-2 mb-1 rounded bg-danger-subtle border-start border-danger border-3">
+                  <div class="d-flex justify-content-between">
+                    <strong class="text-danger small"><i class="fas fa-fire me-1"></i>{{ system_alerts.critical_count }} Critical Area{{ 's' if system_alerts.critical_count != 1 else '' }}</strong>
+                    <a href="{{ url_for('neighbourhoods') }}?risk=High" class="small fw-700 text-danger">View</a>
+                  </div>
+                  <div class="text-muted" style="font-size:11px">High risk score requiring surveillance triage.</div>
+                </div>
+              {% endif %}
+              {% if system_alerts.pending_reviews_count > 0 %}
+                <div class="notification-item p-2 mb-1 rounded bg-warning-subtle border-start border-warning border-3">
+                  <div class="d-flex justify-content-between">
+                    <strong class="text-warning-emphasis small"><i class="fas fa-user-clock me-1"></i>{{ system_alerts.pending_reviews_count }} Review{{ 's' if system_alerts.pending_reviews_count != 1 else '' }} Pending</strong>
+                    <a href="{{ url_for('review_queue') }}" class="small fw-700 text-warning-emphasis">Queue</a>
+                  </div>
+                  <div class="text-muted" style="font-size:11px">Human review mandatory before public communications.</div>
+                </div>
+              {% endif %}
+              {% if system_alerts.open_escalations_count > 0 %}
+                <div class="notification-item p-2 mb-1 rounded bg-danger-subtle border-start border-danger border-3">
+                  <div class="d-flex justify-content-between">
+                    <strong class="text-danger small"><i class="fas fa-exclamation-triangle me-1"></i>{{ system_alerts.open_escalations_count }} Open Escalation{{ 's' if system_alerts.open_escalations_count != 1 else '' }}</strong>
+                    <a href="{{ url_for('escalation') }}" class="small fw-700 text-danger">Escalations</a>
+                  </div>
+                  <div class="text-muted" style="font-size:11px">High Risk / Emergency cases awaiting resolution.</div>
+                </div>
+              {% endif %}
+              {% if system_alerts.data_issues_count > 0 %}
+                <div class="notification-item p-2 mb-1 rounded bg-warning-subtle border-start border-warning border-3">
+                  <div class="d-flex justify-content-between">
+                    <strong class="text-warning-emphasis small"><i class="fas fa-clipboard-list me-1"></i>{{ system_alerts.data_issues_count }} Data Quality Issue{{ 's' if system_alerts.data_issues_count != 1 else '' }}</strong>
+                    <a href="{{ url_for('data_quality') }}" class="small fw-700 text-warning-emphasis">Validate</a>
+                  </div>
+                  <div class="text-muted" style="font-size:11px">Missing sensor inputs or conflicting metrics flagged.</div>
+                </div>
+              {% endif %}
+              {% if system_alerts.failed_comms_count > 0 %}
+                <div class="notification-item p-2 mb-1 rounded bg-danger-subtle border-start border-danger border-3">
+                  <div class="d-flex justify-content-between">
+                    <strong class="text-danger small"><i class="fas fa-satellite-dish me-1"></i>{{ system_alerts.failed_comms_count }} Delivery Failure{{ 's' if system_alerts.failed_comms_count != 1 else '' }}</strong>
+                    <a href="{{ url_for('communication') }}" class="small fw-700 text-danger">Comms</a>
+                  </div>
+                  <div class="text-muted" style="font-size:11px">Advisories failed delivery through primary channel.</div>
+                </div>
+              {% endif %}
+            {% else %}
+              <div class="text-center py-3 text-muted small">
+                <i class="fas fa-check-circle text-success me-1"></i>All surveillance systems normal
+              </div>
+            {% endif %}
+          </div>
+          <div class="p-2 border-top text-center">
+            <a href="{{ url_for('dashboard') }}" class="small text-primary text-decoration-none fw-600">Go to Main Dashboard</a>
+          </div>
+        </div>
       </div>
 
       <!-- Export dropdown -->
@@ -120,22 +234,34 @@
         <button class="btn btn-sm btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown">
           <i class="fas fa-download me-1"></i>Export
         </button>
-        <ul class="dropdown-menu dropdown-menu-end">
-          <li><a class="dropdown-item" href="{{ url_for('export_report', report_type='high_risk') }}"><i class="fas fa-fire me-2 text-danger"></i>High-Risk Areas</a></li>
-          <li><a class="dropdown-item" href="{{ url_for('export_report', report_type='all_neighbourhoods') }}"><i class="fas fa-map me-2 text-primary"></i>All Neighbourhoods</a></li>
-          <li><a class="dropdown-item" href="{{ url_for('export_report', report_type='review_queue') }}"><i class="fas fa-clipboard me-2 text-warning"></i>Review Queue</a></li>
-          <li><a class="dropdown-item" href="{{ url_for('export_report', report_type='communications') }}"><i class="fas fa-bullhorn me-2 text-success"></i>Communications</a></li>
-          <li><a class="dropdown-item" href="{{ url_for('export_report', report_type='audit') }}"><i class="fas fa-history me-2"></i>Audit Log</a></li>
+        <ul class="dropdown-menu dropdown-menu-end shadow">
+          <li><a class="dropdown-item" href="{{ url_for('export_report', report_type='high_risk') }}"><i class="fas fa-fire me-2 text-danger"></i>High-Risk Areas (CSV)</a></li>
+          <li><a class="dropdown-item" href="{{ url_for('export_report', report_type='all_neighbourhoods') }}"><i class="fas fa-map me-2 text-primary"></i>All Neighbourhoods (CSV)</a></li>
+          <li><a class="dropdown-item" href="{{ url_for('export_report', report_type='review_queue') }}"><i class="fas fa-clipboard me-2 text-warning"></i>Review Queue (CSV)</a></li>
+          <li><a class="dropdown-item" href="{{ url_for('export_report', report_type='communications') }}"><i class="fas fa-bullhorn me-2 text-success"></i>Communications (CSV)</a></li>
+          <li><a class="dropdown-item" href="{{ url_for('export_report', report_type='audit') }}"><i class="fas fa-history me-2 text-secondary"></i>Audit Log (CSV)</a></li>
         </ul>
       </div>
 
-      <!-- Logout -->
-      <a href="{{ url_for('logout') }}" class="btn btn-sm btn-outline-danger" title="Sign out">
-        <i class="fas fa-sign-out-alt me-1"></i>Logout
+      <!-- User avatar & logout -->
+      <a href="{{ url_for('logout') }}" class="btn btn-sm btn-outline-danger" title="Sign out of system">
+        <i class="fas fa-sign-out-alt"></i>
       </a>
     </div>
   </header>
 
+  <!-- Flash Messages Banner -->
+  <div class="px-4 pt-3">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% for cat, msg in messages %}
+        <div class="alert alert-{{ cat }} alert-dismissible fade show py-2 px-3 shadow-sm mb-2" role="alert" style="font-size:13px">
+          <i class="fas {{ 'fa-check-circle' if cat=='success' else ('fa-exclamation-triangle' if cat in ('danger','warning') else 'fa-info-circle') }} me-2"></i>
+          {{ msg }}
+          <button type="button" class="btn-close py-2" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+      {% endfor %}
+    {% endwith %}
+  </div>
 
   <!-- Page body -->
   <main class="page-body">

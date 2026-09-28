@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block title %}404 Not Found{% endblock %}
+{% block page_title %}<i class="fas fa-exclamation-circle me-2 text-danger"></i>Page Not Found{% endblock %}
+{% block breadcrumb %}HTTP 404 Error{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center py-5">
+  <div class="col-md-7 text-center">
+    <div class="card p-5 shadow-sm">
+      <div class="mb-4">
+        <i class="fas fa-map-marked-alt text-muted" style="font-size:72px"></i>
+      </div>
+      <h2 class="fw-800 text-slate-800 mb-2">404 - Resource Not Found</h2>
+      <p class="text-muted mb-4">
+        The public-health surveillance record, dashboard view, or resource you requested does not exist or has been moved.
+      </p>
+      <div class="d-flex justify-content-center gap-3">
+        <a href="{{ url_for('dashboard') }}" class="btn btn-primary px-4">
+          <i class="fas fa-tachometer-alt me-2"></i>Return to Dashboard
+        </a>
+        <a href="{{ url_for('neighbourhoods') }}" class="btn btn-outline-secondary px-4">
+          <i class="fas fa-map-marker-alt me-2"></i>View Neighbourhoods
+        </a>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

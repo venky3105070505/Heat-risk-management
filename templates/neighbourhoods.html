@@ -1,58 +1,140 @@
 {% extends "base.html" %}
-{% block title %}Neighbourhoods{% endblock %}
-{% block page_title %}<i class="fas fa-map-marker-alt me-2 text-primary"></i>Neighbourhood Dataset{% endblock %}
-{% block breadcrumb %}All 60 monitored neighbourhoods — sortable and filterable{% endblock %}
+{% block title %}Neighbourhood Surveillance Directory{% endblock %}
+{% block page_title %}<i class="fas fa-map-marker-alt me-2 text-primary"></i>Neighbourhood Surveillance Directory{% endblock %}
+{% block breadcrumb %}All 60 monitored sectors — comprehensive multi-criteria filtering, sorting, and triage{% endblock %}
 
 {% block content %}
-<!-- Filter bar -->
-<div class="card mb-3">
-  <div class="card-body py-3">
-    <div class="row g-2 align-items-end">
-      <div class="col-md-3">
-        <label class="form-label">Search</label>
-        <input type="text" class="form-control" id="searchInput" placeholder="Neighbourhood name…">
+<!-- Advanced Filter & Search Card -->
+<div class="card mb-4 border-0 shadow-sm">
+  <div class="card-header bg-white border-bottom py-3 d-flex justify-content-between align-items-center">
+    <div>
+      <h6 class="fw-800 mb-0 text-slate-800"><i class="fas fa-sliders-h me-2 text-primary"></i>Multi-Criteria Filtering & Search</h6>
+      <small class="text-muted">Filter surveillance dataset by epidemiological, environmental, and operational constraints</small>
+    </div>
+    <div class="d-flex align-items-center gap-2">
+      <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="collapse" data-bs-target="#advancedFiltersCollapse" aria-expanded="true">
+        <i class="fas fa-filter me-1"></i>Toggle Filters
+      </button>
+      <button class="btn btn-sm btn-outline-danger" onclick="resetFilters()">
+        <i class="fas fa-redo me-1"></i>Reset
+      </button>
+    </div>
+  </div>
+  <div class="card-body collapse show" id="advancedFiltersCollapse">
+    <div class="row g-3">
+      <!-- Search -->
+      <div class="col-lg-3 col-md-6">
+        <label class="form-label small fw-700">Search Neighbourhood / ID</label>
+        <div class="input-group input-group-sm">
+          <span class="input-group-text"><i class="fas fa-search text-muted"></i></span>
+          <input type="text" class="form-control" id="filterSearch" placeholder="E.g. Bankstown, NB002..." oninput="applyFilters()">
+        </div>
       </div>
-      <div class="col-md-2">
-        <label class="form-label">Risk Level</label>
-        <select class="form-select" id="riskFilter">
-          <option value="">All</option>
-          <option value="High">High</option>
-          <option value="Medium">Medium</option>
-          <option value="Low">Low</option>
-          <option value="AMBIGUOUS">Ambiguous</option>
+
+      <!-- Risk Level -->
+      <div class="col-lg-3 col-md-6">
+        <label class="form-label small fw-700">Risk Classification</label>
+        <select class="form-select form-select-sm" id="filterRiskLevel" onchange="applyFilters()">
+          <option value="">All Risk Levels</option>
+          <option value="High">High Risk</option>
+          <option value="Medium">Medium Risk</option>
+          <option value="Low">Low Risk</option>
+          <option value="AMBIGUOUS">Ambiguous / Data Issue</option>
         </select>
       </div>
-      <div class="col-md-2">
-        <label class="form-label">Sort by</label>
-        <select class="form-select" id="sortBy">
-          <option value="risk_score">Risk Score</option>
-          <option value="temperature">Temperature</option>
-          <option value="vulnerability_score">Vulnerability</option>
-          <option value="service_access_score">Service Access</option>
+
+      <!-- Human Review Status -->
+      <div class="col-lg-3 col-md-6">
+        <label class="form-label small fw-700">Human Review Status</label>
+        <select class="form-select form-select-sm" id="filterReviewStatus" onchange="applyFilters()">
+          <option value="">All Review States</option>
+          <option value="needs_review">Needs Review Point</option>
+          <option value="in_review">In Review / In Progress</option>
+          <option value="approved">Approved</option>
+          <option value="none">No Review Flag</option>
         </select>
       </div>
-      <div class="col-md-2">
-        <button class="btn btn-primary w-100" onclick="applyFilters()">
-          <i class="fas fa-filter me-1"></i>Apply
-        </button>
+
+      <!-- Escalation Status -->
+      <div class="col-lg-3 col-md-6">
+        <label class="form-label small fw-700">Escalation Status</label>
+        <select class="form-select form-select-sm" id="filterEscalationStatus" onchange="applyFilters()">
+          <option value="">All Escalation States</option>
+          <option value="open">Active Escalation Open</option>
+          <option value="none">Normal / Unescalated</option>
+        </select>
       </div>
-      <div class="col-md-3 ms-auto text-end">
-        <a href="{{ url_for('export_report', report_type='high_risk') }}" class="btn btn-outline-danger btn-sm me-1">
-          <i class="fas fa-download me-1"></i>Export High-Risk CSV
-        </a>
+
+      <!-- Data Quality Flag -->
+      <div class="col-lg-3 col-md-6">
+        <label class="form-label small fw-700">Data Quality Flag</label>
+        <select class="form-select form-select-sm" id="filterDataQuality" onchange="applyFilters()">
+          <option value="">All Quality States</option>
+          <option value="OK">OK (Valid Record)</option>
+          <option value="MISSING_TEMPERATURE">Missing Temperature</option>
+          <option value="MISSING_VULNERABILITY">Missing Vulnerability</option>
+          <option value="EXTREME_VALUE">Extreme Value / Sensor Error</option>
+        </select>
+      </div>
+
+      <!-- Score Range -->
+      <div class="col-lg-3 col-md-6">
+        <label class="form-label small fw-700">Risk Score Range (0 - 100)</label>
+        <div class="d-flex gap-2">
+          <input type="number" id="filterMinScore" class="form-control form-control-sm" placeholder="Min" min="0" max="100" oninput="applyFilters()">
+          <input type="number" id="filterMaxScore" class="form-control form-control-sm" placeholder="Max" min="0" max="100" oninput="applyFilters()">
+        </div>
+      </div>
+
+      <!-- Temperature Range -->
+      <div class="col-lg-3 col-md-6">
+        <label class="form-label small fw-700">Temperature Range (°C)</label>
+        <div class="d-flex gap-2">
+          <input type="number" id="filterMinTemp" class="form-control form-control-sm" placeholder="Min °C" min="20" max="60" oninput="applyFilters()">
+          <input type="number" id="filterMaxTemp" class="form-control form-control-sm" placeholder="Max °C" min="20" max="60" oninput="applyFilters()">
+        </div>
+      </div>
+
+      <!-- Sort By -->
+      <div class="col-lg-3 col-md-6">
+        <label class="form-label small fw-700">Sort Directory By</label>
+        <div class="d-flex gap-1">
+          <select class="form-select form-select-sm" id="sortBy" onchange="applyFilters()">
+            <option value="score">Risk Score</option>
+            <option value="temp">Temperature</option>
+            <option value="vuln">Vulnerability Score</option>
+            <option value="pop">Population</option>
+            <option value="serv">Service Access</option>
+            <option value="name">Name</option>
+          </select>
+          <select class="form-select form-select-sm" id="sortOrder" style="max-width:85px" onchange="applyFilters()">
+            <option value="desc">Desc</option>
+            <option value="asc">Asc</option>
+          </select>
+        </div>
       </div>
     </div>
   </div>
 </div>
 
-<!-- Table -->
-<div class="card">
-  <div class="card-header d-flex align-items-center justify-content-between">
-    <span><i class="fas fa-table me-2"></i>Neighbourhood Records
-      <span class="badge bg-secondary ms-2" id="rowCount">{{ neighbourhoods|length }}</span>
-    </span>
-    <small class="text-muted">Click a row to view full details</small>
+<!-- Records Table Card -->
+<div class="card border-0 shadow-sm">
+  <div class="card-header bg-white border-bottom py-3 d-flex justify-content-between align-items-center">
+    <div class="d-flex align-items-center gap-2">
+      <span class="fw-800 text-slate-800"><i class="fas fa-table me-2 text-primary"></i>Neighbourhood Records</span>
+      <span class="badge bg-primary" id="rowCount">{{ neighbourhoods|length }} shown</span>
+      <span class="text-muted small">of {{ neighbourhoods|length }} total</span>
+    </div>
+    <div class="d-flex gap-2">
+      <button class="btn btn-sm btn-outline-secondary" onclick="exportFilteredCSV()">
+        <i class="fas fa-file-csv me-1"></i>Export Filtered Table
+      </button>
+      <a href="{{ url_for('export_report', report_type='all_neighbourhoods') }}" class="btn btn-sm btn-outline-primary">
+        <i class="fas fa-download me-1"></i>Full CSV
+      </a>
+    </div>
   </div>
+
   <div class="table-container">
     <table class="hrt-table" id="nbTable">
       <thead>
@@ -61,52 +143,70 @@
           <th>Neighbourhood</th>
           <th>Temp (°C)</th>
           <th>Heat Index</th>
+          <th>Population</th>
           <th>Vulnerability</th>
-          <th>Built Env.</th>
           <th>Service Access</th>
+          <th>Built Env.</th>
           <th>Risk Score</th>
           <th>Risk Level</th>
-          <th>Action</th>
+          <th>Status Flags</th>
+          <th class="text-end">Action</th>
         </tr>
       </thead>
       <tbody id="nbBody">
         {% for nb in neighbourhoods %}
-        <tr class="row-{{ nb.risk_level }}" data-risk="{{ nb.risk_level }}"
-            data-score="{{ nb.risk_score or 0 }}"
-            data-temp="{{ nb.temperature or 0 }}"
-            data-vuln="{{ nb.vulnerability_score or 0 }}"
-            data-serv="{{ nb.service_access_score or 0 }}"
-            data-name="{{ nb.neighbourhood_name|lower }}"
+        <tr class="row-{{ nb.risk_level }}"
+            data-id="{{ nb.neighbourhood_id }}"
+            data-name="{{ nb.neighbourhood_name | lower }}"
+            data-risk="{{ nb.risk_level }}"
+            data-score="{{ nb.risk_score or -1 }}"
+            data-temp="{{ nb.temperature or -1 }}"
+            data-vuln="{{ nb.vulnerability_score or -1 }}"
+            data-serv="{{ nb.service_access_score or -1 }}"
+            data-pop="{{ nb.population or 0 }}"
+            data-quality="{{ nb.data_quality_flag or 'OK' }}"
+            data-review="{{ 'needs_review' if nb.needs_review else ('in_review' if nb.review_status == 'In Review' else ('approved' if nb.review_status == 'Approved' else 'none')) }}"
+            data-escalation="{{ 'open' if nb.has_escalation else 'none' }}"
             style="cursor:pointer"
             onclick="window.location='{{ url_for('neighbourhood_detail', nb_id=nb.neighbourhood_id) }}'">
-          <td><code style="font-size:11px">{{ nb.neighbourhood_id }}</code></td>
-          <td><strong>{{ nb.neighbourhood_name }}</strong></td>
+          <td><code>{{ nb.neighbourhood_id }}</code></td>
+          <td>
+            <strong>{{ nb.neighbourhood_name }}</strong>
+            {% if nb.has_escalation %}
+              <span class="badge bg-danger ms-1" style="font-size:9px"><i class="fas fa-radiation"></i> Escalated</span>
+            {% endif %}
+          </td>
           <td>
             {% if nb.temperature %}
               <span class="{{ 'text-high fw-700' if nb.temperature > 38 else ('text-medium fw-700' if nb.temperature > 32 else '') }}">
                 {{ nb.temperature }}°C
               </span>
             {% else %}
-              <span class="text-muted"><i class="fas fa-exclamation-triangle"></i> Missing</span>
+              <span class="badge bg-warning text-dark"><i class="fas fa-exclamation-triangle"></i> Null</span>
             {% endif %}
           </td>
           <td>{{ nb.heat_index if nb.heat_index else '—' }}</td>
+          <td><span class="text-muted small">{{ '{:,}'.format(nb.population) if nb.population else '—' }}</span></td>
           <td>
             <div class="d-flex align-items-center gap-2">
-              <div class="risk-bar" style="width:70px">
+              <div class="risk-bar" style="width:55px">
                 <div class="risk-bar-fill fill-{{ 'High' if (nb.vulnerability_score or 0) > 60 else ('Medium' if (nb.vulnerability_score or 0) > 35 else 'Low') }}"
                      style="width:{{ nb.vulnerability_score or 0 }}%"></div>
               </div>
-              <span style="font-size:12px">{{ nb.vulnerability_score or '—' }}</span>
+              <span style="font-size:12px;font-weight:600">{{ nb.vulnerability_score or '—' }}</span>
             </div>
           </td>
-          <td>{{ nb.built_environment_score or '—' }}</td>
-          <td>{{ nb.service_access_score or '—' }}</td>
           <td>
-            {% if nb.risk_score %}
-              <strong>{{ nb.risk_score }}</strong>
+            <span class="{{ 'text-danger fw-700' if (nb.service_access_score or 100) < 40 else '' }}">
+              {{ nb.service_access_score or '—' }}
+            </span>
+          </td>
+          <td>{{ nb.built_environment_score or '—' }}</td>
+          <td>
+            {% if nb.risk_score is not none %}
+              <strong style="font-size:14px">{{ nb.risk_score }}</strong>
             {% else %}
-              <span class="text-muted">N/A</span>
+              <span class="badge bg-secondary">N/A</span>
             {% endif %}
           </td>
           <td>
@@ -115,10 +215,24 @@
               {{ nb.risk_level }}
             </span>
           </td>
-          <td onclick="event.stopPropagation()">
-            <a href="{{ url_for('neighbourhood_detail', nb_id=nb.neighbourhood_id) }}"
-               class="btn btn-sm btn-outline-primary">
-              <i class="fas fa-eye"></i>
+          <td>
+            {% if nb.needs_review %}
+              <span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle" title="Pending Health Officer Review">
+                <i class="fas fa-user-clock"></i> Review
+              </span>
+            {% endif %}
+            {% if nb.data_quality_flag and nb.data_quality_flag != 'OK' %}
+              <span class="badge bg-danger-subtle text-danger border border-danger-subtle" title="{{ nb.data_quality_flag }}">
+                <i class="fas fa-exclamation-circle"></i> Flagged
+              </span>
+            {% endif %}
+            {% if not nb.needs_review and (not nb.data_quality_flag or nb.data_quality_flag == 'OK') %}
+              <span class="text-success small"><i class="fas fa-check"></i> Standard</span>
+            {% endif %}
+          </td>
+          <td class="text-end" onclick="event.stopPropagation()">
+            <a href="{{ url_for('neighbourhood_detail', nb_id=nb.neighbourhood_id) }}" class="btn btn-sm btn-outline-primary py-1 px-2" title="Inspect Full Dossier">
+              <i class="fas fa-arrow-right"></i>
             </a>
           </td>
         </tr>
@@ -132,34 +246,128 @@
 {% block scripts %}
 <script>
 function applyFilters() {
-  const search = document.getElementById('searchInput').value.toLowerCase();
-  const risk   = document.getElementById('riskFilter').value;
-  const sortBy = document.getElementById('sortBy').value;
-  const rows   = Array.from(document.querySelectorAll('#nbBody tr'));
-  let visible  = 0;
+  const search   = document.getElementById('filterSearch').value.toLowerCase().trim();
+  const risk     = document.getElementById('filterRiskLevel').value;
+  const review   = document.getElementById('filterReviewStatus').value;
+  const esc      = document.getElementById('filterEscalationStatus').value;
+  const quality  = document.getElementById('filterDataQuality').value;
+  const minScore = parseFloat(document.getElementById('filterMinScore').value);
+  const maxScore = parseFloat(document.getElementById('filterMaxScore').value);
+  const minTemp  = parseFloat(document.getElementById('filterMinTemp').value);
+  const maxTemp  = parseFloat(document.getElementById('filterMaxTemp').value);
+  const sortBy   = document.getElementById('sortBy').value;
+  const sortOrder= document.getElementById('sortOrder').value;
 
-  // Filter
+  const rows = Array.from(document.querySelectorAll('#nbBody tr'));
+  let visible = 0;
+
   rows.forEach(r => {
-    const name  = r.dataset.name || '';
-    const level = r.dataset.risk  || '';
-    const show  = (!search || name.includes(search)) && (!risk || level === risk);
-    r.style.display = show ? '' : 'none';
-    if (show) visible++;
-  });
-  document.getElementById('rowCount').textContent = visible;
+    const id       = r.dataset.id.toLowerCase();
+    const name     = r.dataset.name || '';
+    const rRisk    = r.dataset.risk || '';
+    const rScore   = parseFloat(r.dataset.score);
+    const rTemp    = parseFloat(r.dataset.temp);
+    const rQual    = r.dataset.quality || '';
+    const rRev     = r.dataset.review || '';
+    const rEsc     = r.dataset.escalation || '';
 
-  // Sort
+    let match = true;
+
+    // Search query
+    if (search && !(name.includes(search) || id.includes(search))) match = false;
+    // Risk Level
+    if (risk && rRisk !== risk) match = false;
+    // Review Status
+    if (review && rRev !== review) match = false;
+    // Escalation Status
+    if (esc && rEsc !== esc) match = false;
+    // Data quality
+    if (quality && rQual !== quality) match = false;
+    // Score min/max
+    if (!isNaN(minScore) && (rScore < minScore || rScore < 0)) match = false;
+    if (!isNaN(maxScore) && (rScore > maxScore || rScore < 0)) match = false;
+    // Temp min/max
+    if (!isNaN(minTemp) && (rTemp < minTemp || rTemp < 0)) match = false;
+    if (!isNaN(maxTemp) && (rTemp > maxTemp || rTemp < 0)) match = false;
+
+    r.style.display = match ? '' : 'none';
+    if (match) visible++;
+  });
+
+  document.getElementById('rowCount').textContent = `${visible} shown`;
+
+  // Sorting
   const tbody = document.getElementById('nbBody');
-  const sortedRows = rows.filter(r => r.style.display !== 'none')
-    .sort((a, b) => parseFloat(b.dataset[sortBy === 'risk_score' ? 'score' :
-                                          sortBy === 'temperature' ? 'temp' :
-                                          sortBy === 'vulnerability_score' ? 'vuln' : 'serv'] || 0)
-                   - parseFloat(a.dataset[sortBy === 'risk_score' ? 'score' :
-                                           sortBy === 'temperature' ? 'temp' :
-                                           sortBy === 'vulnerability_score' ? 'vuln' : 'serv'] || 0));
-  sortedRows.forEach(r => tbody.appendChild(r));
+  const visibleRows = rows.filter(r => r.style.display !== 'none');
+
+  visibleRows.sort((a, b) => {
+    let va, vb;
+    if (sortBy === 'name') {
+      va = a.dataset.name;
+      vb = b.dataset.name;
+      return sortOrder === 'asc' ? va.localeCompare(vb) : vb.localeCompare(va);
+    } else {
+      va = parseFloat(a.dataset[sortBy] || -999);
+      vb = parseFloat(b.dataset[sortBy] || -999);
+      return sortOrder === 'asc' ? va - vb : vb - va;
+    }
+  });
+
+  visibleRows.forEach(r => tbody.appendChild(r));
 }
-document.getElementById('searchInput').addEventListener('keyup', applyFilters);
-document.getElementById('riskFilter').addEventListener('change', applyFilters);
+
+function resetFilters() {
+  document.getElementById('filterSearch').value = '';
+  document.getElementById('filterRiskLevel').value = '';
+  document.getElementById('filterReviewStatus').value = '';
+  document.getElementById('filterEscalationStatus').value = '';
+  document.getElementById('filterDataQuality').value = '';
+  document.getElementById('filterMinScore').value = '';
+  document.getElementById('filterMaxScore').value = '';
+  document.getElementById('filterMinTemp').value = '';
+  document.getElementById('filterMaxTemp').value = '';
+  document.getElementById('sortBy').value = 'score';
+  document.getElementById('sortOrder').value = 'desc';
+  applyFilters();
+}
+
+function exportFilteredCSV() {
+  const rows = Array.from(document.querySelectorAll('#nbBody tr')).filter(r => r.style.display !== 'none');
+  if (!rows.length) {
+    alert('No records match current filter.');
+    return;
+  }
+  const headers = ['ID', 'Neighbourhood', 'Temperature', 'Risk Score', 'Risk Level', 'Vulnerability', 'Service Access'];
+  const csvContent = [headers.join(',')];
+  rows.forEach(r => {
+    const cols = [
+      `"${r.dataset.id}"`,
+      `"${r.querySelector('strong').textContent.trim()}"`,
+      r.dataset.temp >= 0 ? r.dataset.temp : '',
+      r.dataset.score >= 0 ? r.dataset.score : '',
+      `"${r.dataset.risk}"`,
+      r.dataset.vuln >= 0 ? r.dataset.vuln : '',
+      r.dataset.serv >= 0 ? r.dataset.serv : ''
+    ];
+    csvContent.push(cols.join(','));
+  });
+  const blob = new Blob([csvContent.join('\n')], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `neighbourhoods_filtered_${new Date().toISOString().slice(0,10)}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  // Preselect from URL if query param present
+  const urlParams = new URLSearchParams(window.location.search);
+  const riskParam = urlParams.get('risk');
+  if (riskParam) {
+    document.getElementById('filterRiskLevel').value = riskParam;
+    applyFilters();
+  }
+});
 </script>
 {% endblock %}

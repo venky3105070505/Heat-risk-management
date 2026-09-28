@@ -299,4 +299,123 @@ document.addEventListener('DOMContentLoaded', () => {
       });
     }
   });
+
+  // Initialize theme on load
+  initTheme();
+
+  // Initialize global search
+  initGlobalSearch();
 });
+
+// ── Dark / Light Mode Toggle ─────────────────────────────────────────────────
+function initTheme() {
+  const savedTheme = localStorage.getItem('heat_planner_theme') || 'light';
+  applyTheme(savedTheme);
+}
+
+function applyTheme(theme) {
+  document.documentElement.setAttribute('data-theme', theme);
+  localStorage.setItem('heat_planner_theme', theme);
+  const icon = document.getElementById('themeIcon');
+  if (icon) {
+    if (theme === 'dark') {
+      icon.classList.remove('fa-moon');
+      icon.classList.add('fa-sun');
+      icon.style.color = '#f59e0b';
+    } else {
+      icon.classList.remove('fa-sun');
+      icon.classList.add('fa-moon');
+      icon.style.color = '';
+    }
+  }
+}
+
+function toggleDarkMode() {
+  const current = document.documentElement.getAttribute('data-theme') || 'light';
+  const next = current === 'dark' ? 'light' : 'dark';
+  applyTheme(next);
+}
+
+// ── Mobile Sidebar Drawer ────────────────────────────────────────────────────
+function toggleSidebar() {
+  const sidebar = document.getElementById('sidebar');
+  const backdrop = document.getElementById('sidebarBackdrop');
+  if (!sidebar) return;
+  sidebar.classList.toggle('open');
+  if (backdrop) {
+    backdrop.classList.toggle('show');
+  }
+}
+
+// ── Global Search Dropdown ───────────────────────────────────────────────────
+function initGlobalSearch() {
+  const searchInput = document.getElementById('globalSearchInput');
+  const resultsContainer = document.getElementById('globalSearchResults');
+  if (!searchInput || !resultsContainer) return;
+
+  let debounceTimer = null;
+
+  searchInput.addEventListener('input', (e) => {
+    clearTimeout(debounceTimer);
+    const query = e.target.value.trim();
+    if (query.length === 0) {
+      resultsContainer.classList.remove('show');
+      resultsContainer.innerHTML = '';
+      return;
+    }
+
+    debounceTimer = setTimeout(() => {
+      fetch(`/api/search?q=${encodeURIComponent(query)}`)
+        .then(res => res.json())
+        .then(results => {
+          if (!results || results.length === 0) {
+            resultsContainer.innerHTML = `
+              <div class="p-3 text-center text-muted small">
+                <i class="fas fa-search me-1"></i>No matching sectors found
+              </div>`;
+            resultsContainer.classList.add('show');
+            return;
+          }
+
+          const badgeClass = level => {
+            if (level === 'High') return 'bg-danger text-white';
+            if (level === 'Medium') return 'bg-warning text-dark';
+            if (level === 'Low') return 'bg-success text-white';
+            return 'bg-purple text-white';
+          };
+
+          resultsContainer.innerHTML = results.slice(0, 8).map(nb => `
+            <a href="/neighbourhood/${nb.id}" class="search-result-item">
+              <div>
+                <strong class="d-block font-size-13">${nb.name}</strong>
+                <span class="text-muted" style="font-size:11px">Sector ID: ${nb.id}</span>
+              </div>
+              <div class="text-end">
+                <span class="badge ${badgeClass(nb.risk_level)}" style="font-size:10px">${nb.risk_level}</span>
+                <small class="d-block text-muted" style="font-size:10px">Score: ${nb.risk_score != null ? nb.risk_score.toFixed(1) : 'N/A'}</small>
+              </div>
+            </a>
+          `).join('');
+          resultsContainer.classList.add('show');
+        })
+        .catch(err => {
+          console.error('Search query error:', err);
+        });
+    }, 200);
+  });
+
+  // Close dropdown when clicking outside
+  document.addEventListener('click', (e) => {
+    if (!searchInput.contains(e.target) && !resultsContainer.contains(e.target)) {
+      resultsContainer.classList.remove('show');
+    }
+  });
+
+  // Close on Escape key
+  searchInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      resultsContainer.classList.remove('show');
+    }
+  });
+}
+

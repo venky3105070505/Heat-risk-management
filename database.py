@@ -180,16 +180,45 @@ def init_db():
         improvement_notes      TEXT,
         submitted_at           TEXT DEFAULT (datetime('now'))
     );
+
+    CREATE TABLE IF NOT EXISTS risk_snapshots (
+        id                   INTEGER PRIMARY KEY AUTOINCREMENT,
+        neighbourhood_id     TEXT NOT NULL,
+        risk_score           REAL,
+        risk_level           TEXT,
+        temperature          REAL,
+        heat_index           REAL,
+        vulnerability_score  REAL,
+        service_access_score REAL,
+        notes                TEXT,
+        recorded_by          INTEGER,
+        recorded_at          TEXT DEFAULT (datetime('now')),
+        FOREIGN KEY (neighbourhood_id) REFERENCES neighbourhoods(neighbourhood_id),
+        FOREIGN KEY (recorded_by) REFERENCES users(id)
+    );
+
+    -- Performance Indexes
+    CREATE INDEX IF NOT EXISTS idx_nb_risk_level ON neighbourhoods(risk_level);
+    CREATE INDEX IF NOT EXISTS idx_nb_risk_score ON neighbourhoods(risk_score);
+    CREATE INDEX IF NOT EXISTS idx_hr_status ON human_reviews(status);
+    CREATE INDEX IF NOT EXISTS idx_esc_status ON escalations(status);
+    CREATE INDEX IF NOT EXISTS idx_comm_status ON communications(status);
+    CREATE INDEX IF NOT EXISTS idx_audit_action ON audit_logs(action);
+    CREATE INDEX IF NOT EXISTS idx_audit_user ON audit_logs(user_id);
+    CREATE INDEX IF NOT EXISTS idx_snapshots_nb ON risk_snapshots(neighbourhood_id);
     """)
     conn.commit()
 
-    # ── Migrate: safe add columns for email-based auth ───────────────────────
+    # ── Migrate: safe add columns for email-based auth & v3 features ────────
     _safe_add_column(cur, "users",         "is_active",        "INTEGER DEFAULT 1")
+    _safe_add_column(cur, "users",         "last_active",      "TEXT")
     _safe_add_column(cur, "human_reviews",  "priority",         "TEXT DEFAULT 'Normal'")
     _safe_add_column(cur, "escalations",    "escalation_type",  "TEXT DEFAULT 'High Risk'")
     _safe_add_column(cur, "escalations",    "current_state",    "TEXT DEFAULT 'Open'")
     _safe_add_column(cur, "escalations",    "resolution_notes", "TEXT")
     _safe_add_column(cur, "communications", "failure_reason",   "TEXT")
+    _safe_add_column(cur, "communications", "target_audience",  "TEXT")
+    _safe_add_column(cur, "communications", "priority",         "TEXT DEFAULT 'Standard'")
     _safe_add_column(cur, "neighbourhoods", "data_quality_flag","TEXT DEFAULT 'OK'")
     conn.commit()
 
@@ -453,3 +482,186 @@ def log_audit(user_id, username, action, entity_type=None,
     """, (user_id, username, action, entity_type, entity_id, detail, ip))
     conn.commit()
     conn.close()
+
+
+def create_snapshot(neighbourhood_id, user_id=None, notes=None):
+    """Save an immutable historical snapshot of current neighbourhood risk metrics."""
+    conn = get_db()
+    nb = conn.execute(
+        "SELECT * FROM neighbourhoods WHERE neighbourhood_id=?", (neighbourhood_id,)
+    ).fetchone()
+    if not nb:
+        conn.close()
+        return None
+    cur = conn.cursor()
+    cur.execute("""
+        INSERT INTO risk_snapshots
+        (neighbourhood_id, risk_score, risk_level, temperature, heat_index,
+         vulnerability_score, service_access_score, notes, recorded_by)
+        VALUES (?,?,?,?,?,?,?,?,?)
+    """, (
+        neighbourhood_id, nb["risk_score"], nb["risk_level"],
+        nb["temperature"], nb["heat_index"], nb["vulnerability_score"],
+        nb["service_access_score"], notes or "Manual health surveillance observation",
+        user_id
+    ))
+    snap_id = cur.lastrowid
+    conn.commit()
+    conn.close()
+    return snap_id
+
+
+def get_snapshots(neighbourhood_id):
+    """Retrieve historical snapshots for a given neighbourhood."""
+    conn = get_db()
+    rows = conn.execute("""
+        SELECT rs.*, u.full_name AS recorder_name
+        FROM risk_snapshots rs
+        LEFT JOIN users u ON rs.recorded_by = u.id
+        WHERE rs.neighbourhood_id=?
+        ORDER BY rs.recorded_at DESC
+    """, (neighbourhood_id,)).fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
+
+
+def get_operational_alerts():
+    """
+    Compute operational alerts directly from live SQLite database state.
+    Returns: critical_nbs, pending_reviews, open_escalations, data_issues, failed_comms.
+    """
+    conn = get_db()
+    critical_nbs = [dict(r) for r in conn.execute(
+        "SELECT neighbourhood_id, neighbourhood_name, risk_score, risk_level, temperature "
+        "FROM neighbourhoods WHERE risk_level='High' OR risk_score >= 80 "
+        "ORDER BY risk_score DESC NULLS LAST LIMIT 5"
+    ).fetchall()]
+
+    pending_reviews = [dict(r) for r in conn.execute(
+        "SELECT hr.*, n.neighbourhood_name FROM human_reviews hr "
+        "JOIN neighbourhoods n ON hr.neighbourhood_id=n.neighbourhood_id "
+        "WHERE hr.status='Pending' ORDER BY hr.created_at DESC LIMIT 5"
+    ).fetchall()]
+
+    open_escalations = [dict(r) for r in conn.execute(
+        "SELECT e.*, n.neighbourhood_name FROM escalations e "
+        "JOIN neighbourhoods n ON e.neighbourhood_id=n.neighbourhood_id "
+        "WHERE e.status='Open' ORDER BY e.created_at DESC LIMIT 5"
+    ).fetchall()]
+
+    data_issues = [dict(r) for r in conn.execute(
+        "SELECT neighbourhood_id, neighbourhood_name, risk_level, data_quality_flag "
+        "FROM neighbourhoods "
+        "WHERE data_quality_flag != 'OK' OR risk_level IN ('AMBIGUOUS','MISSING_DATA','EXTREME_VALUE') "
+        "LIMIT 5"
+    ).fetchall()]
+
+    failed_comms = [dict(r) for r in conn.execute(
+        "SELECT c.*, n.neighbourhood_name FROM communications c "
+        "JOIN neighbourhoods n ON c.neighbourhood_id=n.neighbourhood_id "
+        "WHERE c.status='Failed' ORDER BY c.created_at DESC LIMIT 5"
+    ).fetchall()]
+
+    conn.close()
+    return {
+        "critical_nbs": critical_nbs,
+        "critical_count": len(critical_nbs),
+        "pending_reviews": pending_reviews,
+        "pending_reviews_count": len(pending_reviews),
+        "open_escalations": open_escalations,
+        "open_escalations_count": len(open_escalations),
+        "data_issues": data_issues,
+        "data_issues_count": len(data_issues),
+        "failed_comms": failed_comms,
+        "failed_comms_count": len(failed_comms),
+    }
+
+
+def get_priority_actions():
+    """
+    Automatically generate prioritized, action-oriented recommendations from database state.
+    """
+    conn = get_db()
+    # 1. Pending reviews count
+    rev_cnt = conn.execute("SELECT COUNT(*) c FROM human_reviews WHERE status='Pending'").fetchone()["c"]
+
+    # 2. High-risk areas without any communication yet
+    uncontacted_high = [dict(r) for r in conn.execute("""
+        SELECT n.neighbourhood_id, n.neighbourhood_name, n.risk_score
+        FROM neighbourhoods n
+        WHERE n.risk_level = 'High'
+        AND NOT EXISTS (
+            SELECT 1 FROM communications c
+            WHERE c.neighbourhood_id = n.neighbourhood_id AND c.status = 'Sent'
+        )
+        ORDER BY n.risk_score DESC NULLS LAST
+    """).fetchall()]
+
+    # 3. Unresolved escalations
+    open_esc_cnt = conn.execute("SELECT COUNT(*) c FROM escalations WHERE status='Open'").fetchone()["c"]
+
+    # 4. Data-quality or ambiguous cases
+    dq_cnt = conn.execute("""
+        SELECT COUNT(*) c FROM neighbourhoods
+        WHERE data_quality_flag != 'OK'
+           OR risk_level IN ('AMBIGUOUS','MISSING_DATA','EXTREME_VALUE')
+    """).fetchone()["c"]
+
+    # 5. Failed communications
+    failed_cnt = conn.execute("SELECT COUNT(*) c FROM communications WHERE status='Failed'").fetchone()["c"]
+    conn.close()
+
+    actions = []
+    if rev_cnt > 0:
+        actions.append({
+            "type": "review",
+            "title": f"{rev_cnt} neighbourhood{'s' if rev_cnt != 1 else ''} require human review",
+            "description": "High-risk or ambiguous cases require Health Officer or Admin assessment.",
+            "link": "/review-queue",
+            "badge": "Mandatory",
+            "urgency": "danger" if rev_cnt >= 3 else "warning",
+            "icon": "fa-user-check"
+        })
+    if uncontacted_high:
+        actions.append({
+            "type": "communication",
+            "title": f"{len(uncontacted_high)} high-risk area{'s' if len(uncontacted_high) != 1 else ''} require communication",
+            "description": f"Targeted heat safety outreach needed for: {', '.join(h['neighbourhood_name'] for h in uncontacted_high[:3])}.",
+            "link": f"/communication?nb={uncontacted_high[0]['neighbourhood_id']}",
+            "badge": "Action Needed",
+            "urgency": "danger",
+            "icon": "fa-bullhorn"
+        })
+    if open_esc_cnt > 0:
+        actions.append({
+            "type": "escalation",
+            "title": f"{open_esc_cnt} escalation{' is' if open_esc_cnt == 1 else 's are'} unresolved",
+            "description": "Immediate intervention cases awaiting officer response coordination.",
+            "link": "/escalation",
+            "badge": "Urgent",
+            "urgency": "danger",
+            "icon": "fa-exclamation-triangle"
+        })
+    if dq_cnt > 0:
+        actions.append({
+            "type": "data_quality",
+            "title": f"{dq_cnt} neighbourhood{'s have' if dq_cnt != 1 else ' has'} data-quality issues",
+            "description": "Missing temperatures or conflicting indicators block automated triage.",
+            "link": "/data-quality",
+            "badge": "Data Quality",
+            "urgency": "warning",
+            "icon": "fa-clipboard-list"
+        })
+    if failed_cnt > 0:
+        actions.append({
+            "type": "failed_comms",
+            "title": f"{failed_cnt} advisory delivery failure{'s' if failed_cnt != 1 else ''} reported",
+            "description": "Advisories that encountered system or channel delivery issues.",
+            "link": "/communication",
+            "badge": "Delivery Alert",
+            "urgency": "danger",
+            "icon": "fa-satellite-dish"
+        })
+
+    return actions
+

@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block title %}500 Internal Error{% endblock %}
+{% block page_title %}<i class="fas fa-exclamation-triangle me-2 text-danger"></i>System Error{% endblock %}
+{% block breadcrumb %}HTTP 500 Server Error{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center py-5">
+  <div class="col-md-7 text-center">
+    <div class="card p-5 shadow-sm">
+      <div class="mb-4">
+        <i class="fas fa-server text-warning" style="font-size:72px"></i>
+      </div>
+      <h2 class="fw-800 text-slate-800 mb-2">500 - Surveillance System Error</h2>
+      <p class="text-muted mb-4">
+        An unexpected error occurred during operation processing. Technical details have been logged to the public health system audit registry.
+      </p>
+      <div class="d-flex justify-content-center gap-3">
+        <a href="{{ url_for('dashboard') }}" class="btn btn-primary px-4">
+          <i class="fas fa-tachometer-alt me-2"></i>Return to Dashboard
+        </a>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -1,59 +1,111 @@
 {% extends "base.html" %}
-{% block title %}Communication Planner{% endblock %}
-{% block page_title %}<i class="fas fa-bullhorn me-2 text-primary"></i>Communication Planner{% endblock %}
-{% block breadcrumb %}Send risk-based communications to neighbourhoods{% endblock %}
+{% block title %}Public Health Communication Planner{% endblock %}
+{% block page_title %}<i class="fas fa-bullhorn me-2 text-primary"></i>Public Health Communication Planner{% endblock %}
+{% block breadcrumb %}Targeted advisory formulation, multi-channel dissemination, and delivery audit registry{% endblock %}
 
 {% block content %}
-<div class="row g-3">
-  <!-- Send form -->
-  <div class="col-lg-4">
-    <div class="card">
-      <div class="card-header"><i class="fas fa-paper-plane me-2 text-primary"></i>Send Communication</div>
+<!-- Prototype / Operational Simulation Banner -->
+<div class="alert alert-info py-2 px-3 mb-4 shadow-sm border-info-subtle d-flex align-items-center justify-content-between">
+  <div class="d-flex align-items-center gap-2">
+    <i class="fas fa-info-circle fa-lg text-primary"></i>
+    <span class="small">
+      <strong>Operational Planning Prototype Mode:</strong> Communications recorded here simulate multi-channel public health dispatch. Deliveries are logged to the audit registry for operational planning without incurring external carrier charges.
+    </span>
+  </div>
+  <span class="badge bg-primary">Simulation Active</span>
+</div>
+
+<div class="row g-4">
+  <!-- Left Column: Communication Dispatcher -->
+  <div class="col-lg-5">
+    <div class="card border-0 shadow-sm mb-4">
+      <div class="card-header bg-white border-bottom py-3">
+        <h6 class="fw-800 mb-0 text-slate-800"><i class="fas fa-paper-plane me-2 text-primary"></i>Dispatch Public Health Advisory</h6>
+        <small class="text-muted">Formulate targeted advisory by neighbourhood risk profile</small>
+      </div>
       <div class="card-body">
-        <form method="POST">
+        <form id="commForm" method="POST" action="{{ url_for('communication') }}">
+          <!-- Select Sector -->
           <div class="mb-3">
-            <label class="form-label">Select Neighbourhood</label>
-            <select class="form-select" name="neighbourhood_id" id="nbSelect" required onchange="updatePlan()">
-              <option value="">— Choose neighbourhood —</option>
-              {% for nb in neighbourhoods %}
-              <option value="{{ nb.neighbourhood_id }}" data-risk="{{ nb.risk_level }}" data-score="{{ nb.risk_score or 0 }}"
-                {% if nb.neighbourhood_id == preselect_nb %}selected{% endif %}>
-                {{ nb.neighbourhood_name }} ({{ nb.risk_level }})
-              </option>
+            <label class="form-label small fw-700">Target Neighbourhood <span class="text-danger">*</span></label>
+            <select name="neighbourhood_id" id="nbSelect" class="form-select" required onchange="updateCommPlan()">
+              <option value="">-- Select Monitored Sector --</option>
+              {% for n in neighbourhoods %}
+                <option value="{{ n.neighbourhood_id }}"
+                        data-risk="{{ n.risk_level }}"
+                        data-score="{{ n.risk_score or 0 }}"
+                        {% if preselect_nb == n.neighbourhood_id %}selected{% endif %}>
+                  {{ n.neighbourhood_name }} ({{ n.risk_level }} Risk - Score: {{ n.risk_score or 'N/A' }})
+                </option>
               {% endfor %}
             </select>
           </div>
-          <!-- Risk preview -->
-          <div id="riskPreview" class="mb-3" style="display:none">
-            <div class="p-2 rounded" id="riskPreviewBox" style="font-size:13px;font-weight:600"></div>
-          </div>
-          <div class="mb-3">
-            <label class="form-label">Communication Channels</label>
-            {% for ch in channels_all %}
-            <div class="form-check">
-              <input class="form-check-input" type="checkbox" name="channels" value="{{ ch }}" id="ch_{{ loop.index }}">
-              <label class="form-check-label" for="ch_{{ loop.index }}">{{ ch }}</label>
+
+          <!-- Dynamic Plan Summary -->
+          <div id="planSummaryBox" class="p-3 rounded bg-light border mb-3">
+            <div class="d-flex justify-content-between align-items-center mb-1">
+              <span class="small fw-700 text-muted">Audience & Urgency</span>
+              <span id="planUrgencyBadge" class="badge bg-secondary">Select Sector</span>
             </div>
-            {% endfor %}
+            <div id="planTargetAudience" class="small text-muted mb-2">Target audience will populate automatically.</div>
+            <div class="small fw-700 text-muted mb-1">Recommended Advisory Preview:</div>
+            <div id="planMessagePreview" class="small p-2 bg-white rounded border text-muted fst-italic">
+              Choose a neighbourhood above to preview clinical heat safety recommendations.
+            </div>
           </div>
+
+          <!-- Dissemination Channels -->
           <div class="mb-3">
-            <label class="form-label">Custom Message <span class="text-muted">(optional)</span></label>
-            <textarea class="form-control" name="custom_message" rows="3"
-              placeholder="Leave blank to use auto-generated risk-based message…"></textarea>
+            <label class="form-label small fw-700">Select Communication Channels <span class="text-danger">*</span></label>
+            <div class="row g-2">
+              {% for ch in channels_all %}
+              <div class="col-sm-6">
+                <div class="form-check p-2 rounded border bg-white">
+                  <input class="form-check-input ms-0 me-2 channel-chk" type="checkbox" name="channels" value="{{ ch }}" id="ch_{{ loop.index }}"
+                         {% if loop.index in (1, 2) %}checked{% endif %}>
+                  <label class="form-check-label small" for="ch_{{ loop.index }}">
+                    <i class="fas {{ 'fa-sms text-primary' if ch=='SMS' else ('fa-user-nurse text-success' if 'Worker' in ch else ('fa-bullhorn text-danger' if 'Public' in ch else ('fa-building text-info' if 'Centre' in ch else ('fa-share-alt text-primary' if 'Social' in ch else 'fa-phone text-warning')))) }} me-1"></i>
+                    {{ ch }}
+                  </label>
+                </div>
+              </div>
+              {% endfor %}
+            </div>
           </div>
-          <button type="submit" class="btn btn-primary w-100">
-            <i class="fas fa-paper-plane me-1"></i>Send Communication
+
+          <!-- Status Simulation Support -->
+          <div class="mb-3">
+            <label class="form-label small fw-700">Dispatch Status</label>
+            <select name="status" class="form-select form-select-sm">
+              <option value="Sent" selected>Dispatched (Sent)</option>
+              <option value="Pending">Queue as Pending Approval</option>
+              <option value="Failed">Simulate Channel Failure (Audit Testing)</option>
+            </select>
+          </div>
+
+          <!-- Custom Message Override -->
+          <div class="mb-3">
+            <label class="form-label small fw-700">Customized Advisory Text (Optional)</label>
+            <textarea name="custom_message" id="customMessage" class="form-control form-control-sm" rows="3" placeholder="Leave empty to use the standard protocol message above..."></textarea>
+          </div>
+
+          <!-- Button triggering confirmation modal -->
+          <button type="button" class="btn btn-primary w-100" onclick="openConfirmationModal()">
+            <i class="fas fa-paper-plane me-1"></i>Review & Confirm Dispatch
           </button>
         </form>
       </div>
     </div>
   </div>
 
-  <!-- History -->
-  <div class="col-lg-8">
-    <div class="card">
-      <div class="card-header d-flex justify-content-between align-items-center">
-        <span><i class="fas fa-history me-2 text-primary"></i>Communication History</span>
+  <!-- Right Column: Dispatched Advisory Registry -->
+  <div class="col-lg-7">
+    <div class="card border-0 shadow-sm">
+      <div class="card-header bg-white border-bottom py-3 d-flex justify-content-between align-items-center">
+        <div>
+          <h6 class="fw-800 mb-0 text-slate-800"><i class="fas fa-history me-2 text-primary"></i>Communication Transmission Registry</h6>
+          <small class="text-muted">Immutable transmission log across SMS, Health Worker, & Public Announcements</small>
+        </div>
         <a href="{{ url_for('export_report', report_type='communications') }}" class="btn btn-sm btn-outline-secondary">
           <i class="fas fa-download me-1"></i>Export CSV
         </a>
@@ -62,37 +114,120 @@
         <table class="hrt-table">
           <thead>
             <tr>
+              <th>Date / Time</th>
               <th>Neighbourhood</th>
-              <th>Risk Level</th>
+              <th>Risk Tier</th>
               <th>Channel</th>
-              <th>Type</th>
               <th>Status</th>
-              <th>Date</th>
-              <th>Message</th>
+              <th>Dispatched By</th>
+              <th class="text-end">Details</th>
             </tr>
           </thead>
           <tbody>
-            {% for c in history %}
-            <tr class="row-{{ c.risk_level }}">
-              <td><strong>{{ c.neighbourhood_name }}</strong></td>
-              <td><span class="badge-risk badge-{{ c.risk_level }}">{{ c.risk_level }}</span></td>
-              <td><span class="badge bg-light text-dark border">{{ c.channel }}</span></td>
-              <td style="font-size:12px">{{ c.message_type or '—' }}</td>
+            {% for h in history %}
+            <tr>
+              <td style="font-size:12px;color:#64748b;white-space:nowrap">{{ h.created_at[:16] }}</td>
               <td>
-                <span class="badge" style="background:{{ '#22c55e' if c.status=='Sent' else '#f97316' }};font-size:11px">
-                  {{ c.status }}
+                <a href="{{ url_for('neighbourhood_detail', nb_id=h.neighbourhood_id) }}" class="fw-700 text-decoration-none">
+                  {{ h.neighbourhood_name }}
+                </a>
+              </td>
+              <td><span class="badge-risk badge-{{ h.risk_level }}">{{ h.risk_level }}</span></td>
+              <td>
+                <span class="badge bg-light text-dark border">
+                  {{ h.channel }}
                 </span>
               </td>
-              <td style="font-size:12px;white-space:nowrap">{{ (c.sent_at or c.created_at)[:10] }}</td>
-              <td style="font-size:12px;max-width:280px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis">
-                <abbr title="{{ c.message_text }}">{{ (c.message_text or '')[:60] }}…</abbr>
+              <td>
+                {% if h.status == 'Sent' %}
+                  <span class="badge bg-success-subtle text-success border border-success-subtle">
+                    <i class="fas fa-check-circle me-1"></i>Sent
+                  </span>
+                {% elif h.status == 'Failed' %}
+                  <span class="badge bg-danger-subtle text-danger border border-danger-subtle" title="{{ h.failure_reason }}">
+                    <i class="fas fa-times-circle me-1"></i>Failed
+                  </span>
+                {% else %}
+                  <span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle">
+                    <i class="fas fa-clock me-1"></i>Pending
+                  </span>
+                {% endif %}
+              </td>
+              <td style="font-size:12px;color:#64748b">Officer #{{ h.sent_by or 1 }}</td>
+              <td class="text-end">
+                <button class="btn btn-sm btn-outline-secondary py-0 px-2" data-bs-toggle="modal" data-bs-target="#viewMsgModal{{ h.id }}" title="View Message Text">
+                  <i class="fas fa-eye"></i>
+                </button>
+
+                <!-- Message Detail Modal -->
+                <div class="modal fade text-start" id="viewMsgModal{{ h.id }}" tabindex="-1" aria-hidden="true">
+                  <div class="modal-dialog">
+                    <div class="modal-content">
+                      <div class="modal-header">
+                        <h6 class="modal-title fw-800"><i class="fas fa-envelope-open-text text-primary me-2"></i>Transmission #{{ h.id }}</h6>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                      </div>
+                      <div class="modal-body">
+                        <div class="d-flex justify-content-between mb-2 small text-muted">
+                          <span><strong>Recipient:</strong> {{ h.neighbourhood_name }}</span>
+                          <span><strong>Channel:</strong> {{ h.channel }}</span>
+                        </div>
+                        <div class="p-3 bg-light rounded border small text-dark mb-2">
+                          {{ h.message_text }}
+                        </div>
+                        {% if h.failure_reason %}
+                          <div class="alert alert-danger py-1 px-2 small mb-0">
+                            <strong>Failure Reason:</strong> {{ h.failure_reason }}
+                          </div>
+                        {% endif %}
+                      </div>
+                      <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Close</button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
               </td>
             </tr>
             {% else %}
-            <tr><td colspan="7" class="text-center text-muted py-4">No communications yet.</td></tr>
+            <tr>
+              <td colspan="7" class="text-center py-4 text-muted">
+                No communications have been dispatched yet.
+              </td>
+            </tr>
             {% endfor %}
           </tbody>
         </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Dispatch Confirmation Modal -->
+<div class="modal fade" id="confirmDispatchModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header bg-primary text-white">
+        <h6 class="modal-title fw-800"><i class="fas fa-shield-alt me-2"></i>Confirm Public Health Advisory Dispatch</h6>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <p class="small text-muted mb-2">
+          You are about to record a public health advisory broadcast for <strong id="modalTargetSector" class="text-dark">—</strong>.
+        </p>
+        <div class="p-2 rounded bg-light border small mb-2">
+          <div><strong>Selected Channels:</strong> <span id="modalChannels">—</span></div>
+          <div><strong>Transmission Status:</strong> <span id="modalStatus">—</span></div>
+        </div>
+        <p class="small text-muted mb-0">
+          This advisory transmission will be logged in the public health communications registry and linked to the sector's operational dossier.
+        </p>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-primary btn-sm" onclick="document.getElementById('commForm').submit()">
+          <i class="fas fa-check me-1"></i>Confirm & Record Dispatch
+        </button>
       </div>
     </div>
   </div>
@@ -101,28 +236,71 @@
 
 {% block scripts %}
 <script>
-const riskColors = {
-  High: { bg: '#fef2f2', color: '#dc2626', label: '🚨 URGENT — Automatic urgent communication + field response required' },
-  Medium: { bg: '#fff7ed', color: '#c2410c', label: '⚠ ELEVATED — Targeted preventive communication recommended' },
-  Low: { bg: '#f0fdf4', color: '#15803d', label: '✓ LOW — General heat safety awareness advisory' },
-  AMBIGUOUS: { bg: '#faf5ff', color: '#7e22ce', label: '🔍 AMBIGUOUS — Manual Health Officer review required before sending' },
+const PLANS = {
+  High: {
+    urgency: "Critical / Immediate (P1)",
+    audience: "All Residents, High-Risk Vulnerable Clusters, Care Homes & Shelters",
+    message: "URGENT HEAT ALERT: Your neighbourhood is at HIGH heat risk. Cooling centres open 24/7. Field health workers deployed. Call 1800-HEALTH for immediate assistance."
+  },
+  Medium: {
+    urgency: "Elevated Priority (P2)",
+    audience: "Vulnerable Populations, Outdoor Workers, Elderly & Chronic Patients",
+    message: "Elevated heat risk detected in your area. Please avoid outdoor activities 10am–3pm, visit your nearest cooling centre, and contact local health worker if unwell."
+  },
+  Low: {
+    urgency: "Standard Advisory (P3)",
+    audience: "General Public, Low-Risk Households & Community Centres",
+    message: "Heat safety reminder: Stay hydrated, wear light clothing, and check on elderly neighbours. Cooling centres open at community halls."
+  },
+  AMBIGUOUS: {
+    urgency: "Hold / Manual Review",
+    audience: "Public Health Assessment Officers",
+    message: "Communication on hold pending Health Officer review of conflicting or missing indicators."
+  }
 };
 
-function updatePlan() {
+function updateCommPlan() {
   const sel = document.getElementById('nbSelect');
   const opt = sel.options[sel.selectedIndex];
-  const risk = opt.dataset.risk;
-  const preview = document.getElementById('riskPreview');
-  const box = document.getElementById('riskPreviewBox');
-  if (risk && riskColors[risk]) {
-    box.style.background = riskColors[risk].bg;
-    box.style.color = riskColors[risk].color;
-    box.textContent = riskColors[risk].label;
-    preview.style.display = '';
-  } else {
-    preview.style.display = 'none';
+  if (!opt || !opt.value) {
+    document.getElementById('planUrgencyBadge').textContent = 'Select Sector';
+    document.getElementById('planUrgencyBadge').className = 'badge bg-secondary';
+    document.getElementById('planTargetAudience').textContent = 'Target audience will populate automatically.';
+    document.getElementById('planMessagePreview').textContent = 'Choose a neighbourhood above to preview clinical heat safety recommendations.';
+    return;
   }
+  const risk = opt.dataset.risk || 'Low';
+  const plan = PLANS[risk] || PLANS['Low'];
+  document.getElementById('planUrgencyBadge').textContent = plan.urgency;
+  document.getElementById('planUrgencyBadge').className = `badge bg-${risk === 'High' ? 'danger' : (risk === 'Medium' ? 'warning text-dark' : 'success')}`;
+  document.getElementById('planTargetAudience').textContent = `Audience: ${plan.audience}`;
+  document.getElementById('planMessagePreview').textContent = plan.message;
 }
+
+function openConfirmationModal() {
+  const sel = document.getElementById('nbSelect');
+  if (!sel.value) {
+    alert('Please select a target neighbourhood first.');
+    return;
+  }
+  const chks = Array.from(document.querySelectorAll('.channel-chk:checked')).map(c => c.value);
+  if (!chks.length) {
+    alert('Please select at least one communication channel.');
+    return;
+  }
+  const opt = sel.options[sel.selectedIndex];
+  document.getElementById('modalTargetSector').textContent = opt.textContent.trim();
+  document.getElementById('modalChannels').textContent = chks.join(', ');
+  document.getElementById('modalStatus').textContent = document.querySelector('select[name="status"]').value;
+
+  const modal = new bootstrap.Modal(document.getElementById('confirmDispatchModal'));
+  modal.show();
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  if (document.getElementById('nbSelect').value) {
+    updateCommPlan();
+  }
+});
 </script>
 {% endblock %}
-

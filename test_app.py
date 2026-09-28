@@ -734,3 +734,138 @@ class TestDatabase:
         ).fetchall()}
         conn.close()
         assert "failure_reason" in cols
+
+    def test_risk_snapshots_table_exists(self):
+        """risk_snapshots table must exist in database."""
+        conn = sqlite3.connect(DB_PATH)
+        conn.row_factory = sqlite3.Row
+        tables = {r["name"] for r in conn.execute(
+            "SELECT name FROM sqlite_master WHERE type='table'"
+        ).fetchall()}
+        conn.close()
+        assert "risk_snapshots" in tables
+
+    def test_user_last_active_column_exists(self):
+        """last_active must exist in users table."""
+        conn = sqlite3.connect(DB_PATH)
+        conn.row_factory = sqlite3.Row
+        cols = {c["name"] for c in conn.execute(
+            "PRAGMA table_info(users)"
+        ).fetchall()}
+        conn.close()
+        assert "last_active" in cols
+
+
+# ── User Management Tests ─────────────────────────────────────────────────────
+
+class TestUserManagement:
+    def test_admin_can_access_user_management(self, client):
+        login_as(client, "Administrator")
+        resp = client.get("/users")
+        assert resp.status_code == 200
+        assert b"User Management" in resp.data
+
+    def test_health_officer_forbidden_user_management(self, client):
+        login_as(client, "Health Officer")
+        resp = client.get("/users", follow_redirects=True)
+        assert resp.status_code == 200
+        assert b"Access denied" in resp.data
+
+    def test_field_officer_forbidden_user_management(self, client):
+        login_as(client, "Field Officer")
+        resp = client.get("/users", follow_redirects=True)
+        assert resp.status_code == 200
+        assert b"Access denied" in resp.data
+
+    def test_admin_toggle_user_status(self, client):
+        login_as(client, "Administrator")
+        conn = sqlite3.connect(DB_PATH)
+        conn.row_factory = sqlite3.Row
+        field_user = conn.execute("SELECT id, is_active FROM users WHERE email='testfield@healthdept.local'").fetchone()
+        conn.close()
+        assert field_user is not None
+        uid = field_user["id"]
+        orig_status = field_user["is_active"]
+
+        # Toggle status
+        resp = client.post(f"/users/{uid}/toggle-status", follow_redirects=True)
+        assert resp.status_code == 200
+
+        conn = sqlite3.connect(DB_PATH)
+        conn.row_factory = sqlite3.Row
+        updated = conn.execute("SELECT is_active FROM users WHERE id=?", (uid,)).fetchone()
+        conn.close()
+        assert updated["is_active"] != orig_status
+
+        # Toggle back to ensure test environment cleanliness
+        client.post(f"/users/{uid}/toggle-status", follow_redirects=True)
+
+
+# ── Global Search Tests ───────────────────────────────────────────────────────
+
+class TestGlobalSearch:
+    def test_search_returns_json(self, client):
+        login_as(client, "Health Officer")
+        resp = client.get("/api/search?q=a")
+        assert resp.status_code == 200
+        assert resp.is_json
+        data = resp.get_json()
+        assert isinstance(data, list)
+
+    def test_search_empty_query(self, client):
+        login_as(client, "Health Officer")
+        resp = client.get("/api/search?q=")
+        assert resp.status_code == 200
+        data = resp.get_json()
+        assert data == []
+
+
+# ── Notification Center Tests ─────────────────────────────────────────────────
+
+class TestNotifications:
+    def test_notifications_api(self, client):
+        login_as(client, "Health Officer")
+        resp = client.get("/api/notifications")
+        assert resp.status_code == 200
+        assert resp.is_json
+        data = resp.get_json()
+        assert data["status"] == "ok"
+        assert "unread_count" in data
+        assert "alerts" in data
+        assert "priority_actions" in data
+
+
+# ── Trend & Snapshot Tests ────────────────────────────────────────────────────
+
+class TestSnapshots:
+    def test_record_snapshot(self, client):
+        login_as(client, "Health Officer")
+        # Get first neighbourhood ID
+        conn = sqlite3.connect(DB_PATH)
+        conn.row_factory = sqlite3.Row
+        nb = conn.execute("SELECT neighbourhood_id FROM neighbourhoods LIMIT 1").fetchone()
+        conn.close()
+        nb_id = nb["neighbourhood_id"]
+
+        resp = client.post(f"/neighbourhood/{nb_id}/snapshot", data={"notes": "Heat wave surveillance round 1"}, follow_redirects=True)
+        assert resp.status_code == 200
+
+        conn = sqlite3.connect(DB_PATH)
+        conn.row_factory = sqlite3.Row
+        snap = conn.execute("SELECT * FROM risk_snapshots WHERE neighbourhood_id=? ORDER BY id DESC LIMIT 1", (nb_id,)).fetchone()
+        conn.close()
+        assert snap is not None
+        assert snap["neighbourhood_id"] == nb_id
+
+
+# ── Custom Error Pages Tests ──────────────────────────────────────────────────
+
+class TestErrorPages:
+    def test_404_error_page(self, client):
+        login_as(client, "Health Officer")
+        resp = client.get("/non_existent_route_404_test")
+        assert resp.status_code == 404
+        assert b"404" in resp.data
+        assert b"Resource Not Found" in resp.data
+
+

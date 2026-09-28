@@ -261,44 +261,42 @@ def compute_risk_score(nb):
 
 def classify_escalation_state(nb):
     """
-    Return the current escalation state for a neighbourhood.
-
-    States:
-      NORMAL      — Low risk, no action required
-      MONITORING  — Low-Medium, watch closely
-      TARGETED    — Medium risk, targeted response needed
-      HIGH_REVIEW — High risk, Health Officer review mandatory
-      IMMEDIATE   — Emergency, immediate escalation
-      MANUAL      — Ambiguous/missing, manual review
+    Return the current escalation state for a neighbourhood following the 6-stage operational pipeline:
+      NORMAL → MONITORING → TARGETED RESPONSE → HUMAN OFFICER REVIEW → HIGH RISK ESCALATION → IMMEDIATE ESCALATION
+      (plus MANUAL for ambiguous/data-quality cases).
     """
     risk_level = _get(nb, "risk_level") or "AMBIGUOUS"
     risk_score = _get(nb, "risk_score")
 
     if risk_level in ("MISSING_DATA", "EXTREME_VALUE"):
-        return {"state": "MANUAL",    "label": "Manual Review Required",   "colour": "ambig",  "icon": "fa-question-circle"}
+        return {"state": "MANUAL",          "label": "Manual Review Required",    "colour": "ambig",  "icon": "fa-question-circle", "order": 0}
     if risk_level == "AMBIGUOUS":
-        return {"state": "MANUAL",    "label": "Manual Review — Ambiguous","colour": "ambig",  "icon": "fa-exclamation-circle"}
+        return {"state": "MANUAL",          "label": "Manual Review — Ambiguous", "colour": "ambig",  "icon": "fa-exclamation-circle", "order": 0}
     if risk_score is not None and float(risk_score) >= 90:
-        return {"state": "IMMEDIATE", "label": "Immediate Escalation",     "colour": "emerg",  "icon": "fa-ambulance"}
+        return {"state": "IMMEDIATE",       "label": "Immediate Escalation",      "colour": "emerg",  "icon": "fa-ambulance", "order": 6}
+    if risk_score is not None and float(risk_score) >= 85:
+        return {"state": "HIGH_ESCALATION", "label": "High Risk Escalation",      "colour": "high",   "icon": "fa-radiation", "order": 5}
     if risk_level == "High":
-        return {"state": "HIGH_REVIEW","label": "Health Officer Review",   "colour": "high",   "icon": "fa-user-md"}
+        return {"state": "HIGH_REVIEW",     "label": "Human Officer Review",      "colour": "high",   "icon": "fa-user-md", "order": 4}
     if risk_level == "Medium":
         score = float(risk_score or 0)
         if score >= 55:
-            return {"state": "TARGETED",  "label": "Targeted Response",   "colour": "medium", "icon": "fa-bullseye"}
-        return {"state": "MONITORING","label": "Active Monitoring",        "colour": "medium", "icon": "fa-eye"}
-    return {"state": "NORMAL",    "label": "Normal — Low Risk",            "colour": "low",    "icon": "fa-check-circle"}
+            return {"state": "TARGETED",    "label": "Targeted Response",         "colour": "medium", "icon": "fa-bullseye", "order": 3}
+        return {"state": "MONITORING",      "label": "Active Monitoring",         "colour": "medium", "icon": "fa-eye", "order": 2}
+    return {"state": "NORMAL",              "label": "Normal — Low Risk",         "colour": "low",    "icon": "fa-check-circle", "order": 1}
 
 
 def get_communication_plan(risk_level, channels_selected=None):
     """
     Return recommended communication actions based on risk level.
-    Fixed: selected channels used directly; not filtered to plan defaults.
+    Includes target audience, urgency, priority, and channel mix.
     """
     plans = {
         "Low": {
-            "urgency":      "Standard",
-            "message_type": "General Heat Safety Awareness",
+            "urgency":          "Standard",
+            "priority":         "Standard (P3)",
+            "target_audience":  "General Public, Low-Risk Households & Community Centres",
+            "message_type":     "General Heat Safety Awareness",
             "message": (
                 "Heat safety reminder for your neighbourhood. Stay hydrated, "
                 "wear light clothing, and check on elderly neighbours. "
@@ -308,8 +306,10 @@ def get_communication_plan(risk_level, channels_selected=None):
             "actions":  ["Send general advisory", "Monitor weekly"],
         },
         "Medium": {
-            "urgency":      "Elevated",
-            "message_type": "Targeted Preventive Communication",
+            "urgency":          "Elevated",
+            "priority":         "Elevated Priority (P2)",
+            "target_audience":  "Vulnerable Populations, Outdoor Workers, Elderly & Chronic Patients",
+            "message_type":     "Targeted Preventive Communication",
             "message": (
                 "Elevated heat risk detected in your area. Please take precautions: "
                 "avoid outdoor activities 10am–3pm, visit your nearest cooling centre, "
@@ -323,8 +323,10 @@ def get_communication_plan(risk_level, channels_selected=None):
             ],
         },
         "High": {
-            "urgency":      "Urgent",
-            "message_type": "Urgent Targeted Communication",
+            "urgency":          "Urgent",
+            "priority":         "Critical / Immediate (P1)",
+            "target_audience":  "All Residents, High-Risk Vulnerable Clusters, Care Homes & Shelters",
+            "message_type":     "Urgent Targeted Communication",
             "message": (
                 "URGENT HEAT ALERT for your neighbourhood. Your area is at HIGH heat risk. "
                 "Cooling centres are open 24/7. Field health workers are deployed in your area. "
@@ -341,15 +343,19 @@ def get_communication_plan(risk_level, channels_selected=None):
             ],
         },
         "AMBIGUOUS": {
-            "urgency":      "Review Required",
-            "message_type": "Manual Review — Hold Communication",
+            "urgency":          "Review Required",
+            "priority":         "Hold / Internal Review (P0)",
+            "target_audience":  "Public Health Data & Surveillance Officers",
+            "message_type":     "Manual Review — Hold Communication",
             "message": "Communication on hold pending Health Officer review of conflicting or missing indicators.",
             "channels": [],
             "actions":  ["Manual review by Health Officer", "Do not send automated advisory"],
         },
         "MISSING_DATA": {
-            "urgency":      "Review Required",
-            "message_type": "Manual Review — Missing Critical Data",
+            "urgency":          "Review Required",
+            "priority":         "Data Validation Hold (P0)",
+            "target_audience":  "Health Surveillance Data Team",
+            "message_type":     "Manual Review — Missing Critical Data",
             "message": "Communication blocked: critical data (temperature / vulnerability) is missing. Manual review required.",
             "channels": [],
             "actions":  [
@@ -359,8 +365,10 @@ def get_communication_plan(risk_level, channels_selected=None):
             ],
         },
         "EXTREME_VALUE": {
-            "urgency":      "Data Validation Required",
-            "message_type": "Data Quality Alert",
+            "urgency":          "Data Validation Required",
+            "priority":         "Sensor Outlier Validation (P0)",
+            "target_audience":  "City Environmental Sensor Network Team",
+            "message_type":     "Data Quality Alert",
             "message": "Extreme sensor value detected. Communication blocked pending data validation by the data team.",
             "channels": [],
             "actions":  [
@@ -371,7 +379,6 @@ def get_communication_plan(risk_level, channels_selected=None):
         },
     }
     plan = dict(plans.get(risk_level, plans["AMBIGUOUS"]))
-    # BUG FIX v2: use selected channels directly (do not filter to plan defaults)
     if channels_selected:
         plan["channels"] = list(channels_selected)
     return plan

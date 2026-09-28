@@ -1,0 +1,247 @@
+{% extends "base.html" %}
+{% block title %}Public Health Analytics & Insights{% endblock %}
+{% block page_title %}<i class="fas fa-chart-line me-2 text-primary"></i>Public Health Analytics & Insights{% endblock %}
+{% block breadcrumb %}Factual epidemiological and environmental risk analysis across all 60 monitored sectors{% endblock %}
+
+{% block content %}
+<!-- Executive Analytics KPIs -->
+<div class="row g-3 mb-4">
+  <div class="col-md-3 col-sm-6">
+    <div class="stat-card stat-high">
+      <div class="stat-icon"><i class="fas fa-fire"></i></div>
+      <div>
+        <div class="stat-value text-high">{{ high_risk|length }}</div>
+        <div class="stat-label">Critical High-Risk Areas</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-3 col-sm-6">
+    <div class="stat-card stat-medium">
+      <div class="stat-icon"><i class="fas fa-user-shield"></i></div>
+      <div>
+        <div class="stat-value text-medium">{{ high_vuln|length }}</div>
+        <div class="stat-label">High Vulnerability (>60)</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-3 col-sm-6">
+    <div class="stat-card stat-purple">
+      <div class="stat-icon"><i class="fas fa-ambulance"></i></div>
+      <div>
+        <div class="stat-value text-ambig">{{ poor_service|length }}</div>
+        <div class="stat-label">Underserved Access (<40)</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-3 col-sm-6">
+    <div class="stat-card stat-info">
+      <div class="stat-icon"><i class="fas fa-satellite-dish"></i></div>
+      <div>
+        <div class="stat-value text-primary">{{ avg_reach['High'] }}%</div>
+        <div class="stat-label">Avg Reach in High-Risk Areas</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Charts Section 1 -->
+<div class="row g-3 mb-4">
+  <div class="col-lg-6">
+    <div class="card h-100">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <span><i class="fas fa-thermometer-half me-2 text-danger"></i>Temperature vs. Risk Score Correlation</span>
+        <span class="badge bg-light text-dark border">Correlation Analysis</span>
+      </div>
+      <div class="card-body">
+        <canvas id="analyticsTempChart" height="230"></canvas>
+      </div>
+    </div>
+  </div>
+  <div class="col-lg-6">
+    <div class="card h-100">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <span><i class="fas fa-users me-2 text-warning"></i>Vulnerability vs. Risk Score Correlation</span>
+        <span class="badge bg-light text-dark border">Demographic Stress</span>
+      </div>
+      <div class="card-body">
+        <canvas id="analyticsVulnChart" height="230"></canvas>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Charts Section 2 -->
+<div class="row g-3 mb-4">
+  <div class="col-lg-6">
+    <div class="card h-100">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <span><i class="fas fa-bullhorn me-2 text-primary"></i>Communication Reach % by Risk Tier</span>
+        <span class="badge bg-light text-dark border">Advisory Coverage</span>
+      </div>
+      <div class="card-body">
+        <canvas id="analyticsReachChart" height="220"></canvas>
+      </div>
+    </div>
+  </div>
+  <div class="col-lg-6">
+    <div class="card h-100">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <span><i class="fas fa-chart-pie me-2 text-primary"></i>Risk Category Proportions</span>
+        <span class="badge bg-light text-dark border">City Overview</span>
+      </div>
+      <div class="card-body d-flex align-items-center justify-content-center">
+        <div style="max-width:280px;width:100%">
+          <canvas id="analyticsDonutChart" height="220"></canvas>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Detailed Data Tables -->
+<div class="row g-3 mb-4">
+  <div class="col-lg-6">
+    <div class="card h-100">
+      <div class="card-header d-flex justify-content-between align-items-center bg-danger-subtle text-danger">
+        <span><i class="fas fa-exclamation-triangle me-2"></i>Top 10 Highest Risk Neighbourhoods</span>
+        <a href="{{ url_for('export_report', report_type='high_risk') }}" class="btn btn-sm btn-outline-danger">
+          <i class="fas fa-download me-1"></i>CSV
+        </a>
+      </div>
+      <div class="table-container">
+        <table class="hrt-table">
+          <thead>
+            <tr>
+              <th>Neighbourhood</th>
+              <th>Temp</th>
+              <th>Vuln</th>
+              <th>Risk Score</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for n in high_risk[:10] %}
+            <tr>
+              <td>
+                <a href="{{ url_for('neighbourhood_detail', nb_id=n.neighbourhood_id) }}" class="fw-700 text-decoration-none">
+                  {{ n.neighbourhood_name }}
+                </a>
+              </td>
+              <td><span class="text-danger fw-700">{{ n.temperature }}°C</span></td>
+              <td>{{ n.vulnerability_score }}</td>
+              <td><span class="badge bg-danger">{{ n.risk_score }}</span></td>
+              <td>
+                <a href="{{ url_for('neighbourhood_detail', nb_id=n.neighbourhood_id) }}" class="btn btn-sm btn-outline-primary py-0 px-2">
+                  <i class="fas fa-eye"></i>
+                </a>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-lg-6">
+    <div class="card h-100">
+      <div class="card-header d-flex justify-content-between align-items-center bg-warning-subtle text-dark">
+        <span><i class="fas fa-hospital-user me-2 text-warning"></i>Areas with Constrained Healthcare & Cooling Access</span>
+        <span class="badge bg-secondary">{{ poor_service|length }} Areas</span>
+      </div>
+      <div class="table-container">
+        <table class="hrt-table">
+          <thead>
+            <tr>
+              <th>Neighbourhood</th>
+              <th>Cooling Centres</th>
+              <th>Nearest Hosp</th>
+              <th>Service Score</th>
+              <th>Risk Level</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for n in poor_service[:10] %}
+            <tr>
+              <td>
+                <a href="{{ url_for('neighbourhood_detail', nb_id=n.neighbourhood_id) }}" class="fw-700 text-decoration-none">
+                  {{ n.neighbourhood_name }}
+                </a>
+              </td>
+              <td>
+                <span class="{{ 'badge bg-danger' if n.cooling_centres == 0 else 'badge bg-secondary' }}">
+                  {{ n.cooling_centres }} centre{{ 's' if n.cooling_centres != 1 else '' }}
+                </span>
+              </td>
+              <td>{{ n.nearest_hospital_distance }} km</td>
+              <td><span class="fw-700 text-danger">{{ n.service_access_score }}</span></td>
+              <td>
+                <span class="badge-risk badge-{{ n.risk_level }}">{{ n.risk_level }}</span>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const analyticsNbs = {{ nbs | tojson }};
+const avgReach = {{ avg_reach | tojson }};
+
+document.addEventListener('DOMContentLoaded', () => {
+  // Scatter 1: Temp vs Risk
+  const tempRiskData = analyticsNbs
+    .filter(n => n.temperature != null && n.risk_score != null)
+    .map(n => ({ x: n.temperature, y: n.risk_score, name: n.neighbourhood_name, level: n.risk_level }));
+  initScatter('analyticsTempChart', tempRiskData, 'Surface Temperature (°C)', 'Heat Risk Score');
+
+  // Scatter 2: Vuln vs Risk
+  const vulnRiskData = analyticsNbs
+    .filter(n => n.vulnerability_score != null && n.risk_score != null)
+    .map(n => ({ x: n.vulnerability_score, y: n.risk_score, name: n.neighbourhood_name, level: n.risk_level }));
+  initScatter('analyticsVulnChart', vulnRiskData, 'Social Vulnerability Score (0-100)', 'Heat Risk Score');
+
+  // Bar: Reach % by Tier
+  const reachCtx = document.getElementById('analyticsReachChart');
+  if (reachCtx) {
+    new Chart(reachCtx, {
+      type: 'bar',
+      data: {
+        labels: ['High Risk', 'Medium Risk', 'Low Risk'],
+        datasets: [{
+          label: 'Average Advisory Reach %',
+          data: [avgReach['High'] || 0, avgReach['Medium'] || 0, avgReach['Low'] || 0],
+          backgroundColor: ['#ef4444', '#f97316', '#22c55e'],
+          borderRadius: 6
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        scales: {
+          y: { min: 0, max: 100, title: { display: true, text: 'Reach Percentage (%)' } }
+        },
+        plugins: {
+          legend: { display: false }
+        }
+      }
+    });
+  }
+
+  // Donut: Proportions
+  const highCnt = analyticsNbs.filter(n => n.risk_level === 'High').length;
+  const medCnt = analyticsNbs.filter(n => n.risk_level === 'Medium').length;
+  const lowCnt = analyticsNbs.filter(n => n.risk_level === 'Low').length;
+  const ambigCnt = analyticsNbs.filter(n => ['AMBIGUOUS', 'MISSING_DATA', 'EXTREME_VALUE'].includes(n.risk_level)).length;
+  initRiskDonut('analyticsDonutChart', {
+    labels: ['High', 'Medium', 'Low', 'Ambiguous'],
+    values: [highCnt, medCnt, lowCnt, ambigCnt]
+  });
+});
+</script>
+{% endblock %}

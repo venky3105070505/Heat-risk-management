@@ -1,54 +1,137 @@
 {% extends "base.html" %}
 {% block title %}Interactive Risk Map{% endblock %}
-{% block page_title %}<i class="fas fa-globe me-2 text-primary"></i>Interactive Risk Map{% endblock %}
-{% block breadcrumb %}60 neighbourhoods colour-coded by heat-risk level — click any marker for details{% endblock %}
+{% block page_title %}<i class="fas fa-globe-americas me-2 text-primary"></i>Metropolitan Heat-Risk Interactive Map{% endblock %}
+{% block breadcrumb %}Geospatial public health surveillance with heat density visualization & operational filtering{% endblock %}
 
 {% block head %}
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <style>
-#map{height:calc(100vh - 190px);border-radius:12px;box-shadow:0 4px 24px rgba(0,0,0,.12)}
-.map-filters{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
-.filter-btn{padding:6px 16px;border-radius:20px;border:2px solid transparent;
-  font-size:12.5px;font-weight:600;cursor:pointer;transition:all .18s}
-.filter-btn.f-all      {background:#1e293b;color:#fff;border-color:#1e293b}
-.filter-btn.f-high     {background:#fee2e2;color:#991b1b;border-color:#fca5a5}
-.filter-btn.f-medium   {background:#fef9c3;color:#854d0e;border-color:#fde047}
-.filter-btn.f-low      {background:#dcfce7;color:#166534;border-color:#86efac}
-.filter-btn.f-review   {background:#eff6ff;color:#1e40af;border-color:#93c5fd}
-.filter-btn.f-escalated{background:#fdf4ff;color:#6b21a8;border-color:#d8b4fe}
-.filter-btn.active     {filter:brightness(0.84);box-shadow:0 0 0 3px rgba(0,0,0,.18)}
-.map-legend .ld{display:inline-block;width:13px;height:13px;border-radius:50%;margin-right:6px;vertical-align:middle}
+  #map {
+    height: calc(100vh - 210px);
+    min-height: 520px;
+    border-radius: 12px;
+    box-shadow: 0 4px 20px rgba(0,0,0,.08);
+  }
+  .map-filter-chip {
+    padding: 6px 14px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    border: 1px solid #cbd5e1;
+    background: #fff;
+    color: #475569;
+    transition: all .18s;
+  }
+  .map-filter-chip.active {
+    background: #1a56db;
+    color: #fff;
+    border-color: #1a56db;
+    box-shadow: 0 2px 8px rgba(26,86,219,.3);
+  }
+  .map-filter-chip:hover:not(.active) {
+    background: #f1f5f9;
+  }
+  .map-legend-dot {
+    display: inline-block;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    margin-right: 6px;
+    vertical-align: middle;
+  }
 </style>
 {% endblock %}
 
 {% block content %}
-<div class="map-filters">
-  <button class="filter-btn f-all active" onclick="filterMap('all',this)"><i class="fas fa-globe me-1"></i>All</button>
-  <button class="filter-btn f-high"       onclick="filterMap('high',this)"><i class="fas fa-fire me-1"></i>High Risk</button>
-  <button class="filter-btn f-medium"     onclick="filterMap('medium',this)"><i class="fas fa-exclamation me-1"></i>Medium</button>
-  <button class="filter-btn f-low"        onclick="filterMap('low',this)"><i class="fas fa-check me-1"></i>Low Risk</button>
-  <button class="filter-btn f-review"     onclick="filterMap('review',this)"><i class="fas fa-clipboard-check me-1"></i>Needs Review</button>
-  <button class="filter-btn f-escalated"  onclick="filterMap('escalated',this)"><i class="fas fa-exclamation-triangle me-1"></i>Escalated</button>
+<!-- Map Filter Bar -->
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
+  <div class="d-flex flex-wrap align-items-center gap-2">
+    <button class="map-filter-chip active" onclick="filterMap('all', this)">
+      <i class="fas fa-globe me-1"></i>All Sectors
+    </button>
+    <button class="map-filter-chip" onclick="filterMap('high', this)">
+      <i class="fas fa-fire text-danger me-1"></i>High Risk Only
+    </button>
+    <button class="map-filter-chip" onclick="filterMap('medium', this)">
+      <i class="fas fa-exclamation text-warning me-1"></i>Medium Risk
+    </button>
+    <button class="map-filter-chip" onclick="filterMap('low', this)">
+      <i class="fas fa-check text-success me-1"></i>Low Risk
+    </button>
+    <button class="map-filter-chip" onclick="filterMap('ambiguous', this)">
+      <i class="fas fa-question-circle text-purple me-1"></i>Ambiguous / Flagged
+    </button>
+    <button class="map-filter-chip" onclick="filterMap('review', this)">
+      <i class="fas fa-clipboard-check text-warning me-1"></i>Needs Human Review
+    </button>
+    <button class="map-filter-chip" onclick="filterMap('escalated', this)">
+      <i class="fas fa-radiation text-danger me-1"></i>Open Escalations
+    </button>
+  </div>
+
+  <div class="d-flex align-items-center gap-2">
+    <div class="form-check form-switch mb-0">
+      <input class="form-check-input" type="checkbox" id="heatmapToggle" onchange="toggleHeatmap(this.checked)">
+      <label class="form-check-label small fw-700" for="heatmapToggle">
+        <i class="fas fa-fire-alt text-danger me-1"></i>Heatmap Density
+      </label>
+    </div>
+  </div>
 </div>
+
 <div class="row g-3">
-  <div class="col-lg-9"><div id="map"></div></div>
+  <div class="col-lg-9">
+    <div id="map"></div>
+  </div>
+
   <div class="col-lg-3">
-    <div class="card h-100">
-      <div class="card-header"><i class="fas fa-layer-group me-2 text-primary"></i>Legend & Stats</div>
+    <!-- Map Legend Card -->
+    <div class="card shadow-sm border-0 mb-3">
+      <div class="card-header bg-white border-bottom py-3">
+        <h6 class="fw-800 mb-0 text-slate-800"><i class="fas fa-layer-group me-2 text-primary"></i>Surveillance Legend</h6>
+      </div>
       <div class="card-body">
-        <div class="map-legend" style="font-size:13px;line-height:2">
-          <div><span class="ld" style="background:#ef4444"></span>High Risk</div>
-          <div><span class="ld" style="background:#f97316"></span>Medium Risk</div>
-          <div><span class="ld" style="background:#22c55e"></span>Low Risk</div>
-          <div><span class="ld" style="background:#a855f7"></span>Ambiguous</div>
-          <div><span class="ld" style="background:#1a56db;outline:2px solid #7c3aed;outline-offset:2px"></span>Escalated</div>
+        <div class="d-flex flex-column gap-2 small">
+          <div class="d-flex align-items-center justify-content-between">
+            <div><span class="map-legend-dot" style="background:#ef4444"></span>High Risk (Score ≥ 70)</div>
+            <span class="badge bg-danger-subtle text-danger" id="countHigh">—</span>
+          </div>
+          <div class="d-flex align-items-center justify-content-between">
+            <div><span class="map-legend-dot" style="background:#f97316"></span>Medium Risk (40 - 69)</div>
+            <span class="badge bg-warning-subtle text-warning-emphasis" id="countMedium">—</span>
+          </div>
+          <div class="d-flex align-items-center justify-content-between">
+            <div><span class="map-legend-dot" style="background:#22c55e"></span>Low Risk (< 40)</div>
+            <span class="badge bg-success-subtle text-success" id="countLow">—</span>
+          </div>
+          <div class="d-flex align-items-center justify-content-between">
+            <div><span class="map-legend-dot" style="background:#a855f7"></span>Ambiguous / Data Issue</div>
+            <span class="badge bg-purple-subtle text-ambig" id="countAmbig">—</span>
+          </div>
+          <hr class="my-2">
+          <div>
+            <span class="badge bg-danger" style="font-size:10px"><i class="fas fa-radiation"></i> Purple Halo</span>
+            <span class="text-muted ms-1">Active Escalation Ticket</span>
+          </div>
+          <div>
+            <span class="badge bg-warning text-dark" style="font-size:10px"><i class="fas fa-user-clock"></i> Orange Ring</span>
+            <span class="text-muted ms-1">Pending Human Review</span>
+          </div>
         </div>
-        <hr>
-        <div class="fw-700 small mb-1">Visible</div>
-        <div id="visCount" class="badge bg-secondary" style="font-size:13px">All 60</div>
-        <hr>
-        <div class="fw-700 small mb-1 mt-1">Instructions</div>
-        <div style="font-size:12px;color:#64748b">Click any marker to see full details and navigate to the neighbourhood page.</div>
+      </div>
+    </div>
+
+    <!-- Active Filter Info Card -->
+    <div class="card shadow-sm border-0">
+      <div class="card-header bg-white border-bottom py-3">
+        <h6 class="fw-800 mb-0 text-slate-800"><i class="fas fa-eye me-2 text-primary"></i>Visible Map Pins</h6>
+      </div>
+      <div class="card-body">
+        <div class="h3 fw-800 text-primary mb-1" id="visCount">60 / 60</div>
+        <p class="text-muted small mb-0">
+          Click any circular pin to view the real-time public health card and navigate to the sector dossier.
+        </p>
       </div>
     </div>
   </div>
@@ -57,70 +140,131 @@
 
 {% block scripts %}
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
 <script>
 const MAP_DATA = {{ map_data | safe }};
-const COLOURS  = {High:'#ef4444',Medium:'#f97316',Low:'#22c55e',
-                  AMBIGUOUS:'#a855f7',MISSING_DATA:'#94a3b8',EXTREME_VALUE:'#f59e0b'};
+const RISK_COLORS = {
+  High: '#ef4444',
+  Medium: '#f97316',
+  Low: '#22c55e',
+  AMBIGUOUS: '#a855f7',
+  MISSING_DATA: '#a855f7',
+  EXTREME_VALUE: '#a855f7'
+};
 
-const leafMap = L.map('map').setView([-33.87, 151.21], 11);
-L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
-  {attribution:'&copy; OpenStreetMap contributors', maxZoom:18}).addTo(leafMap);
+const map = L.map('map').setView([-33.87, 151.21], 11);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  attribution: '&copy; OpenStreetMap contributors | City Health Dept',
+  maxZoom: 18
+}).addTo(map);
 
+const markersGroup = L.layerGroup().addTo(map);
+let heatLayer = null;
 const allMarkers = [];
+
+// Compute Counts
+let cntH = 0, cntM = 0, cntL = 0, cntA = 0;
+const heatPoints = [];
 
 MAP_DATA.forEach(nb => {
   if (!nb.latitude || !nb.longitude) return;
-  const col = COLOURS[nb.risk_level] || '#94a3b8';
-  const m = L.circleMarker([nb.latitude, nb.longitude], {
-    radius:9, fillColor:col,
-    color: nb.has_escalation ? '#7c3aed' : '#fff',
-    weight: nb.has_escalation ? 3 : 1.5,
-    opacity:1, fillOpacity:0.88
+
+  if (nb.risk_level === 'High') cntH++;
+  else if (nb.risk_level === 'Medium') cntM++;
+  else if (nb.risk_level === 'Low') cntL++;
+  else cntA++;
+
+  const intensity = (nb.risk_score || 50) / 100;
+  heatPoints.push([nb.latitude, nb.longitude, intensity]);
+
+  const col = RISK_COLORS[nb.risk_level] || '#94a3b8';
+  const borderColor = nb.has_escalation ? '#7c3aed' : (nb.needs_review ? '#f59e0b' : '#ffffff');
+  const borderWidth = (nb.has_escalation || nb.needs_review) ? 3 : 1.5;
+
+  const marker = L.circleMarker([nb.latitude, nb.longitude], {
+    radius: 9,
+    fillColor: col,
+    color: borderColor,
+    weight: borderWidth,
+    opacity: 1,
+    fillOpacity: 0.9
   });
-  const revBadge = nb.needs_review   ? `<span class="badge bg-warning text-dark ms-1" style="font-size:10px">Review</span>` : '';
-  const escBadge = nb.has_escalation ? `<span class="badge bg-danger ms-1" style="font-size:10px">Escalated</span>` : '';
-  m.bindPopup(`
-    <div style="font-family:'Inter',sans-serif;min-width:200px">
-      <div style="font-weight:800;font-size:14px;margin-bottom:6px">${nb.neighbourhood_name}</div>
-      <div style="margin-bottom:8px">
-        <span class="badge" style="background:${col}">${nb.risk_level}</span>
+
+  const revBadge = nb.needs_review
+    ? `<span class="badge bg-warning text-dark me-1" style="font-size:10px"><i class="fas fa-user-clock"></i> Review Required</span>`
+    : '';
+  const escBadge = nb.has_escalation
+    ? `<span class="badge bg-danger me-1" style="font-size:10px"><i class="fas fa-radiation"></i> Escalation Open</span>`
+    : '';
+
+  marker.bindPopup(`
+    <div style="font-family:'Inter',sans-serif;min-width:220px;padding:4px">
+      <div style="font-weight:800;font-size:14px;color:#1e293b;margin-bottom:4px">${nb.neighbourhood_name} (${nb.neighbourhood_id})</div>
+      <div class="mb-2">
+        <span class="badge" style="background:${col};font-size:11px">${nb.risk_level} Risk</span>
         ${revBadge}${escBadge}
       </div>
-      <table style="font-size:12px;width:100%;border-collapse:collapse">
-        <tr><td style="color:#64748b;padding:2px 4px">Risk Score</td><td style="font-weight:700">${nb.risk_score ?? 'N/A'}</td></tr>
-        <tr><td style="color:#64748b;padding:2px 4px">Temperature</td><td>${nb.temperature ? nb.temperature+'°C' : 'N/A'}</td></tr>
-        <tr><td style="color:#64748b;padding:2px 4px">Vulnerability</td><td>${nb.vulnerability_score ?? 'N/A'}</td></tr>
-        <tr><td style="color:#64748b;padding:2px 4px">Service Access</td><td>${nb.service_access_score ?? 'N/A'}</td></tr>
-        <tr><td style="color:#64748b;padding:2px 4px">Comm. Reach</td><td>${nb.communication_reach_percentage ? nb.communication_reach_percentage+'%' : 'N/A'}</td></tr>
+      <table style="font-size:12px;width:100%;border-collapse:collapse;margin-bottom:8px">
+        <tr style="border-bottom:1px solid #f1f5f9"><td style="color:#64748b;padding:3px 0">Risk Score</td><td style="font-weight:700;text-align:right">${nb.risk_score ?? 'N/A'}</td></tr>
+        <tr style="border-bottom:1px solid #f1f5f9"><td style="color:#64748b;padding:3px 0">Surface Temp</td><td style="font-weight:700;text-align:right">${nb.temperature ? nb.temperature+'°C' : 'Null'}</td></tr>
+        <tr style="border-bottom:1px solid #f1f5f9"><td style="color:#64748b;padding:3px 0">Social Vulnerability</td><td style="text-align:right">${nb.vulnerability_score ?? 'N/A'}</td></tr>
+        <tr style="border-bottom:1px solid #f1f5f9"><td style="color:#64748b;padding:3px 0">Service Access</td><td style="text-align:right">${nb.service_access_score ?? 'N/A'}</td></tr>
+        <tr style="border-bottom:1px solid #f1f5f9"><td style="color:#64748b;padding:3px 0">Cooling Facilities</td><td style="text-align:right">${nb.cooling_centres ?? 0} centres</td></tr>
       </table>
       <a href="/neighbourhood/${nb.neighbourhood_id}"
-         style="display:block;margin-top:10px;text-align:center;padding:7px;
-                background:#1a56db;color:#fff;border-radius:7px;font-size:12px;
-                text-decoration:none;font-weight:700">
-        View Full Details &rarr;
+         style="display:block;text-align:center;padding:7px;background:#1a56db;color:#fff;border-radius:6px;font-size:12px;text-decoration:none;font-weight:700">
+        Open Full Surveillance Dossier &rarr;
       </a>
     </div>
   `);
-  m._nb = nb;
-  m.addTo(leafMap);
-  allMarkers.push(m);
+
+  marker._nb = nb;
+  marker.addTo(markersGroup);
+  allMarkers.push(marker);
 });
 
+document.getElementById('countHigh').textContent = cntH;
+document.getElementById('countMedium').textContent = cntM;
+document.getElementById('countLow').textContent = cntL;
+document.getElementById('countAmbig').textContent = cntA;
+
 function filterMap(type, btn) {
-  document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.map-filter-chip').forEach(b => b.classList.remove('active'));
   btn.classList.add('active');
+
+  markersGroup.clearLayers();
   let visible = 0;
+
   allMarkers.forEach(m => {
     const nb = m._nb;
-    let show = type === 'all'
-      || (type === 'high'      && nb.risk_level === 'High')
-      || (type === 'medium'    && nb.risk_level === 'Medium')
-      || (type === 'low'       && nb.risk_level === 'Low')
-      || (type === 'review'    && nb.needs_review)
+    let show = (type === 'all')
+      || (type === 'high' && nb.risk_level === 'High')
+      || (type === 'medium' && nb.risk_level === 'Medium')
+      || (type === 'low' && nb.risk_level === 'Low')
+      || (type === 'ambiguous' && ['AMBIGUOUS', 'MISSING_DATA', 'EXTREME_VALUE'].includes(nb.risk_level))
+      || (type === 'review' && nb.needs_review)
       || (type === 'escalated' && nb.has_escalation);
-    show ? (m.addTo(leafMap), visible++) : m.remove();
+
+    if (show) {
+      m.addTo(markersGroup);
+      visible++;
+    }
   });
-  document.getElementById('visCount').textContent = `${visible} shown`;
+
+  document.getElementById('visCount').textContent = `${visible} / ${allMarkers.length}`;
+}
+
+function toggleHeatmap(enable) {
+  if (enable) {
+    if (!heatLayer) {
+      heatLayer = L.heatLayer(heatPoints, { radius: 30, blur: 20, maxZoom: 14, max: 1.0 });
+    }
+    heatLayer.addTo(map);
+  } else {
+    if (heatLayer) {
+      map.removeLayer(heatLayer);
+    }
+  }
 }
 </script>
 {% endblock %}
